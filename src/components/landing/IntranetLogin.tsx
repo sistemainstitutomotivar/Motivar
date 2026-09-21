@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { X, Lock, User } from 'lucide-react';
+import { X, Lock, User, Loader2 } from 'lucide-react';
 import type { UserRole } from '../../App';
+import { supabase } from '../../lib/supabase';
 
 interface IntranetLoginProps {
   onClose: () => void;
@@ -11,23 +12,86 @@ export default function IntranetLogin({ onClose, onLogin }: IntranetLoginProps) 
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const [role, setRole] = useState<UserRole>('patient');
+
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [fullName, setFullName] = useState('');
 
   const formatCpf = (value: string) => {
     return value
-      .replace(/\D/g, '') // Remove tudo que não é número
-      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca ponto entre o 3º e o 4º dígitos
-      .replace(/(\d{3})(\d)/, '$1.$2') // Coloca ponto entre o 6º e o 7º dígitos
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2') // Coloca traço entre o 9º e o 10º dígitos
-      .replace(/(-\d{2})\d+?$/, '$1'); // Impede que passe de 14 caracteres no total
+      .replace(/\D/g, '')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1');
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (cpf === '123.456.789-00' && password === '12345678') {
-      onLogin(role); // Passa o papel (role) selecionado
-    } else {
-      setError('CPF ou senha incorretos. Tente CPF: 123.456.789-00');
+    setError('');
+    
+    const cleanCpf = cpf.replace(/\D/g, '');
+    if (cleanCpf.length !== 11) {
+      setError('Por favor, digite um CPF válido com 11 números.');
+      return;
+    }
+    
+    if (isRegistering && fullName.trim().length < 3) {
+      setError('Por favor, digite seu nome completo.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const emailFantasma = `${cleanCpf}@institutomotivar.com.br`;
+      
+      if (isRegistering) {
+        // 1. Cadastrar usuário na Autenticação
+        const { data: authData, error: signUpError } = await supabase.auth.signUp({
+          email: emailFantasma,
+          password: password,
+        });
+
+        if (signUpError) throw signUpError;
+
+        if (authData.user) {
+          // 2. Salvar o Perfil na tabela profiles com a função (role) escolhida
+          const { error: profileError } = await supabase.from('profiles').insert([
+            {
+              id: authData.user.id,
+              full_name: fullName,
+              cpf: cleanCpf,
+              role: role
+            }
+          ]);
+          
+          if (profileError) throw profileError;
+        }
+      } else {
+        // Apenas fazer Login
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: emailFantasma,
+          password: password,
+        });
+
+        if (signInError) throw signInError;
+      }
+      
+      onClose();
+
+    } catch (err: any) {
+      console.error(err);
+      if (err.message === 'Invalid login credentials') {
+        setError('CPF ou senha incorretos.');
+      } else if (err.message === 'User already registered') {
+        setError('Este CPF já está cadastrado.');
+      } else {
+        setError('Erro na comunicação com o servidor. Verifique as configurações.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -38,7 +102,7 @@ export default function IntranetLogin({ onClose, onLogin }: IntranetLoginProps) 
         onClick={onClose}
       />
       <div 
-        className="relative bg-white/95 backdrop-blur-xl border border-white/40 shadow-2xl rounded-3xl p-8"
+        className="relative bg-white/95 backdrop-blur-xl border border-white/40 shadow-2xl rounded-3xl p-8 overflow-y-auto max-h-[90vh]"
         style={{ width: '100%', maxWidth: '420px', minWidth: '300px' }}
       >
         <button 
@@ -53,10 +117,12 @@ export default function IntranetLogin({ onClose, onLogin }: IntranetLoginProps) 
             <Lock size={24} />
           </div>
           <h2 className="text-2xl font-bold text-slate-800 w-full" style={{ wordBreak: 'normal' }}>
-            {role === 'patient' ? 'Área do Paciente' : role === 'professional' ? 'Área do Terapeuta' : 'Administração'}
+            {isRegistering ? 'Criar Nova Conta' : role === 'patient' ? 'Área do Paciente' : role === 'professional' ? 'Área do Terapeuta' : 'Administração'}
           </h2>
           <p className="text-slate-500 text-sm mt-2" style={{ whiteSpace: 'normal', wordBreak: 'normal' }}>
-            {role === 'patient' ? 'Acompanhe as evoluções e agendamentos.' : role === 'professional' ? 'Acesso restrito para terapeutas da clínica.' : 'Gestão administrativa e financeira.'}
+            {isRegistering 
+              ? 'Preencha os dados abaixo para se cadastrar.' 
+              : role === 'patient' ? 'Acompanhe as evoluções e agendamentos.' : role === 'professional' ? 'Acesso restrito para terapeutas da clínica.' : 'Gestão administrativa e financeira.'}
           </p>
         </div>
 
@@ -85,11 +151,30 @@ export default function IntranetLogin({ onClose, onLogin }: IntranetLoginProps) 
           </button>
         </div>
 
-        <form className="space-y-4 w-full flex flex-col" onSubmit={handleLogin}>
+        <form className="space-y-4 w-full flex flex-col" onSubmit={handleSubmit}>
           
           {error && (
             <div className="bg-red-50 text-red-500 text-sm p-3 rounded-lg text-center font-medium border border-red-100">
               {error}
+            </div>
+          )}
+
+          {isRegistering && (
+            <div className="w-full">
+              <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>Nome Completo</label>
+              <div className="relative w-full flex items-center">
+                <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
+                  <User size={18} />
+                </div>
+                <input 
+                  type="text" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Seu nome"
+                  className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
+                  style={{ width: '100%' }}
+                />
+              </div>
             </div>
           )}
 
@@ -126,18 +211,32 @@ export default function IntranetLogin({ onClose, onLogin }: IntranetLoginProps) 
                 style={{ width: '100%' }}
               />
             </div>
-            <div className="flex justify-end mt-2">
-              <a href="#" className="text-xs font-medium text-primary hover:text-primary/80">Esqueceu a senha?</a>
-            </div>
+            {!isRegistering && (
+              <div className="flex justify-end mt-2">
+                <a href="#" className="text-xs font-medium text-primary hover:text-primary/80">Esqueceu a senha?</a>
+              </div>
+            )}
           </div>
 
           <button 
             type="submit"
-            className="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-primary/30 mt-6"
+            disabled={loading}
+            className="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl transition-colors shadow-lg shadow-primary/30 mt-6 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             style={{ width: '100%' }}
           >
-            Acessar Sistema
+            {loading && <Loader2 className="animate-spin" size={20} />}
+            {loading ? 'Processando...' : isRegistering ? 'Criar Conta' : 'Acessar Sistema'}
           </button>
+
+          <div className="text-center mt-4">
+            <button 
+              type="button" 
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-sm text-slate-500 hover:text-primary font-medium transition-colors"
+            >
+              {isRegistering ? 'Já tem uma conta? Fazer Login' : 'Ainda não tem conta? Cadastre-se'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
