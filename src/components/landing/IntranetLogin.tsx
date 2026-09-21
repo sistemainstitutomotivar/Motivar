@@ -82,13 +82,13 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
       onClose();
 
     } catch (err: any) {
-      console.error(err);
+      console.error("ERRO COMPLETO:", err);
       if (err.message === 'Invalid login credentials') {
         setError('CPF ou senha incorretos.');
       } else if (err.message === 'User already registered') {
         setError('Este CPF já está cadastrado.');
       } else {
-        setError('Erro na comunicação com o servidor. Verifique as configurações.');
+        setError(`Erro técnico: ${err.message || 'Falha na comunicação'}`);
       }
     } finally {
       setLoading(false);
