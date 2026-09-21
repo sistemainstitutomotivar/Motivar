@@ -52,28 +52,23 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
 
     try {
       if (isRegistering) {
-        // 1. Cadastrar usuário na Autenticação (usando o E-MAIL REAL informado)
+        // 1. Cadastrar usuário na Autenticação passando os dados do perfil junto
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: emailReal,
           password: password,
+          options: {
+            data: {
+              full_name: fullName,
+              cpf: cleanCpf,
+              role: role
+            }
+          }
         });
 
         if (signUpError) throw signUpError;
-
-        if (authData.user) {
-          // 2. Salvar o Perfil na tabela profiles com o CPF e E-MAIL
-          const { error: profileError } = await supabase.from('profiles').insert([
-            {
-              id: authData.user.id,
-              full_name: fullName,
-              cpf: cleanCpf,
-              email: emailReal, // Salva o e-mail no perfil
-              role: role
-            }
-          ]);
-          
-          if (profileError) throw profileError;
-        }
+        
+        // Removemos o insert manual no frontend! 
+        // O banco de dados (via Trigger) vai fazer isso sozinho de forma 100% segura.
       } else {
         // Apenas fazer Login usando o CPF
         // 1. Chamar a função do banco que busca o e-mail atrelado a este CPF
