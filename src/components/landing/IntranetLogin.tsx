@@ -17,6 +17,7 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [emailReal, setEmailReal] = useState('');
 
   const formatCpf = (value: string) => {
     return value
@@ -42,27 +43,31 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
       return;
     }
 
+    if (isRegistering && (!emailReal.includes('@') || emailReal.length < 5)) {
+      setError('Por favor, digite um e-mail válido.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const emailFantasma = `${cleanCpf}@institutomotivar.com.br`;
-      
       if (isRegistering) {
-        // 1. Cadastrar usuário na Autenticação
+        // 1. Cadastrar usuário na Autenticação (usando o E-MAIL REAL informado)
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
-          email: emailFantasma,
+          email: emailReal,
           password: password,
         });
 
         if (signUpError) throw signUpError;
 
         if (authData.user) {
-          // 2. Salvar o Perfil na tabela profiles com a função (role) escolhida
+          // 2. Salvar o Perfil na tabela profiles com o CPF e E-MAIL
           const { error: profileError } = await supabase.from('profiles').insert([
             {
               id: authData.user.id,
               full_name: fullName,
               cpf: cleanCpf,
+              email: emailReal, // Salva o e-mail no perfil
               role: role
             }
           ]);
@@ -70,9 +75,17 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
           if (profileError) throw profileError;
         }
       } else {
-        // Apenas fazer Login
+        // Apenas fazer Login usando o CPF
+        // 1. Chamar a função do banco que busca o e-mail atrelado a este CPF
+        const { data: emailData, error: rpcError } = await supabase.rpc('get_email_by_cpf', { cpf_input: cleanCpf });
+        
+        if (rpcError || !emailData) {
+          throw new Error('Invalid login credentials'); // Força erro de credencial se não achar CPF
+        }
+
+        // 2. Logar com o e-mail retornado
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: emailFantasma,
+          email: emailData,
           password: password,
         });
 
@@ -160,22 +173,41 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
           )}
 
           {isRegistering && (
-            <div className="w-full">
-              <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>Nome Completo</label>
-              <div className="relative w-full flex items-center">
-                <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
-                  <User size={18} />
+            <>
+              <div className="w-full">
+                <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>Nome Completo</label>
+                <div className="relative w-full flex items-center">
+                  <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
+                    <User size={18} />
+                  </div>
+                  <input 
+                    type="text" 
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Seu nome"
+                    className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
+                    style={{ width: '100%' }}
+                  />
                 </div>
-                <input 
-                  type="text" 
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Seu nome"
-                  className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
-                  style={{ width: '100%' }}
-                />
               </div>
-            </div>
+
+              <div className="w-full">
+                <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>E-mail (Para recuperação de senha)</label>
+                <div className="relative w-full flex items-center">
+                  <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
+                    <User size={18} />
+                  </div>
+                  <input 
+                    type="email" 
+                    value={emailReal}
+                    onChange={(e) => setEmailReal(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div className="w-full">
