@@ -8,7 +8,7 @@ interface IntranetLoginProps {
   onLogin: (role: UserRole) => void;
 }
 
-export default function IntranetLogin({ onClose, onLogin }: IntranetLoginProps) {
+export default function IntranetLogin({ onClose }: IntranetLoginProps) {
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

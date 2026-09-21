@@ -37,7 +37,7 @@ function App() {
   // Busca qual é o nível de acesso (role) do usuário na tabela profiles
   const fetchUserRole = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
