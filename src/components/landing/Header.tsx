@@ -1,12 +1,6 @@
 import { useState } from 'react';
 import IntranetLogin from './IntranetLogin';
-import type { UserRole } from '../../App';
-
-interface HeaderProps {
-  onLogin: (role: UserRole) => void;
-}
-
-export default function Header({ onLogin }: HeaderProps) {
+export default function Header() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   return (
@@ -34,7 +28,7 @@ export default function Header({ onLogin }: HeaderProps) {
         </button>
       </header>
 
-      {isLoginOpen && <IntranetLogin onClose={() => setIsLoginOpen(false)} onLogin={onLogin} />}
+      {isLoginOpen && <IntranetLogin onClose={() => setIsLoginOpen(false)} />}
     </>
   );
 }

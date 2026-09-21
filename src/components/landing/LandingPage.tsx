@@ -1,16 +1,11 @@
 import Header from './Header';
 import HeroSection from './HeroSection';
 import SpecialtyRoom from './SpecialtyRoom';
-import type { UserRole } from '../../App';
 
-interface LandingPageProps {
-  onLogin: (role: UserRole) => void;
-}
-
-export default function LandingPage({ onLogin }: LandingPageProps) {
+export default function LandingPage() {
   return (
     <main className="relative w-full bg-slate-50 min-h-screen">
-      <Header onLogin={onLogin} />
+      <Header />
       
       <HeroSection />
 

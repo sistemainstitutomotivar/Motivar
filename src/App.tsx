@@ -66,7 +66,7 @@ function App() {
     return <Dashboard role={userRole} onLogout={handleLogout} />;
   }
 
-  return <LandingPage onLogin={() => {}} />; // O login real agora é disparado pelo IntranetLogin e pego pelo onAuthStateChange
+  return <LandingPage />;
 }
 
 export default App;

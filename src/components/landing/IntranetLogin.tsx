@@ -5,7 +5,6 @@ import { supabase } from '../../lib/supabase';
 
 interface IntranetLoginProps {
   onClose: () => void;
-  onLogin: (role: UserRole) => void;
 }
 
 export default function IntranetLogin({ onClose }: IntranetLoginProps) {
@@ -14,10 +13,6 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState<UserRole>('patient');
-
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [emailReal, setEmailReal] = useState('');
 
   const formatCpf = (value: string) => {
     return value
@@ -37,55 +32,24 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
       setError('Por favor, digite um CPF válido com 11 números.');
       return;
     }
-    
-    if (isRegistering && fullName.trim().length < 3) {
-      setError('Por favor, digite seu nome completo.');
-      return;
-    }
-
-    if (isRegistering && (!emailReal.includes('@') || emailReal.length < 5)) {
-      setError('Por favor, digite um e-mail válido.');
-      return;
-    }
 
     setLoading(true);
 
     try {
-      if (isRegistering) {
-        // 1. Cadastrar usuário na Autenticação passando os dados do perfil junto
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
-          email: emailReal,
-          password: password,
-          options: {
-            data: {
-              full_name: fullName,
-              cpf: cleanCpf,
-              role: role
-            }
-          }
-        });
-
-        if (signUpError) throw signUpError;
-        
-        // Removemos o insert manual no frontend! 
-        // O banco de dados (via Trigger) vai fazer isso sozinho de forma 100% segura.
-      } else {
-        // Apenas fazer Login usando o CPF
-        // 1. Chamar a função do banco que busca o e-mail atrelado a este CPF
-        const { data: emailData, error: rpcError } = await supabase.rpc('get_email_by_cpf', { cpf_input: cleanCpf });
-        
-        if (rpcError || !emailData) {
-          throw new Error('Invalid login credentials'); // Força erro de credencial se não achar CPF
-        }
-
-        // 2. Logar com o e-mail retornado
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: emailData,
-          password: password,
-        });
-
-        if (signInError) throw signInError;
+      // 1. Chamar a função do banco que busca o e-mail atrelado a este CPF
+      const { data: emailData, error: rpcError } = await supabase.rpc('get_email_by_cpf', { cpf_input: cleanCpf });
+      
+      if (rpcError || !emailData) {
+        throw new Error('Invalid login credentials');
       }
+
+      // 2. Logar com o e-mail retornado
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailData,
+        password: password,
+      });
+
+      if (signInError) throw signInError;
       
       onClose();
 
@@ -93,8 +57,6 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
       console.error("ERRO COMPLETO:", err);
       if (err.message === 'Invalid login credentials') {
         setError('CPF ou senha incorretos.');
-      } else if (err.message === 'User already registered') {
-        setError('Este CPF já está cadastrado.');
       } else {
         setError(`Erro técnico: ${err.message || 'Falha na comunicação'}`);
       }
@@ -125,12 +87,10 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
             <Lock size={24} />
           </div>
           <h2 className="text-2xl font-bold text-slate-800 w-full" style={{ wordBreak: 'normal' }}>
-            {isRegistering ? 'Criar Nova Conta' : role === 'patient' ? 'Área do Paciente' : role === 'professional' ? 'Área do Terapeuta' : 'Administração'}
+            {role === 'patient' ? 'Área do Paciente' : role === 'professional' ? 'Área do Terapeuta' : 'Administração'}
           </h2>
           <p className="text-slate-500 text-sm mt-2" style={{ whiteSpace: 'normal', wordBreak: 'normal' }}>
-            {isRegistering 
-              ? 'Preencha os dados abaixo para se cadastrar.' 
-              : role === 'patient' ? 'Acompanhe as evoluções e agendamentos.' : role === 'professional' ? 'Acesso restrito para terapeutas da clínica.' : 'Gestão administrativa e financeira.'}
+            {role === 'patient' ? 'Acompanhe as evoluções e agendamentos.' : role === 'professional' ? 'Acesso restrito para terapeutas da clínica.' : 'Gestão administrativa e financeira.'}
           </p>
         </div>
 
@@ -167,44 +127,6 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
             </div>
           )}
 
-          {isRegistering && (
-            <>
-              <div className="w-full">
-                <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>Nome Completo</label>
-                <div className="relative w-full flex items-center">
-                  <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
-                    <User size={18} />
-                  </div>
-                  <input 
-                    type="text" 
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Seu nome"
-                    className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-              </div>
-
-              <div className="w-full">
-                <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>E-mail (Para recuperação de senha)</label>
-                <div className="relative w-full flex items-center">
-                  <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
-                    <User size={18} />
-                  </div>
-                  <input 
-                    type="email" 
-                    value={emailReal}
-                    onChange={(e) => setEmailReal(e.target.value)}
-                    placeholder="seu@email.com"
-                    className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
-                    style={{ width: '100%' }}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
           <div className="w-full">
             <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>CPF</label>
             <div className="relative w-full flex items-center">
@@ -238,11 +160,9 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
                 style={{ width: '100%' }}
               />
             </div>
-            {!isRegistering && (
-              <div className="flex justify-end mt-2">
-                <a href="#" className="text-xs font-medium text-primary hover:text-primary/80">Esqueceu a senha?</a>
-              </div>
-            )}
+            <div className="flex justify-end mt-2">
+              <a href="#" className="text-xs font-medium text-primary hover:text-primary/80">Esqueceu a senha?</a>
+            </div>
           </div>
 
           <button 
@@ -252,18 +172,8 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
             style={{ width: '100%' }}
           >
             {loading && <Loader2 className="animate-spin" size={20} />}
-            {loading ? 'Processando...' : isRegistering ? 'Criar Conta' : 'Acessar Sistema'}
+            {loading ? 'Processando...' : 'Acessar Sistema'}
           </button>
-
-          <div className="text-center mt-4">
-            <button 
-              type="button" 
-              onClick={() => setIsRegistering(!isRegistering)}
-              className="text-sm text-slate-500 hover:text-primary font-medium transition-colors"
-            >
-              {isRegistering ? 'Já tem uma conta? Fazer Login' : 'Ainda não tem conta? Cadastre-se'}
-            </button>
-          </div>
         </form>
       </div>
     </div>
