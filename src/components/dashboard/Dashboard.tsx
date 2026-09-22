@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { UserRole } from '../../App';
 import PatientAgenda from './PatientAgenda';
 
@@ -7,6 +8,9 @@ interface DashboardProps {
 }
 
 function Dashboard({ onLogout, role }: DashboardProps) {
+  // Estado local para permitir a simulação de telas durante o desenvolvimento
+  const [activeRole, setActiveRole] = useState<UserRole>(role || 'admin');
+
   return (
     <div className="text-on-surface font-body-md min-h-screen flex flex-col pb-24 md:pb-0 md:flex-row">
       {/* Mobile Top App Bar */}
@@ -38,12 +42,12 @@ function Dashboard({ onLogout, role }: DashboardProps) {
             <li>
               <a className="flex items-center gap-md px-md py-sm bg-primary-container text-on-primary-container rounded-full mx-sm hover:bg-primary-container transition-colors" href="#">
                 <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>dashboard</span>
-                <span className="font-label-md">{role === 'patient' ? 'Minha Agenda' : 'Dashboard'}</span>
+                <span className="font-label-md">{activeRole === 'patient' ? 'Minha Agenda' : 'Dashboard'}</span>
               </a>
             </li>
 
             {/* Apenas Profissionais e Admins */}
-            {(role === 'professional' || role === 'admin') && (
+            {(activeRole === 'professional' || activeRole === 'admin') && (
               <li>
                 <a className="flex items-center gap-md px-md py-sm text-on-surface-variant mx-sm hover:bg-surface-variant rounded-full transition-colors" href="#">
                   <span className="material-symbols-outlined">assignment_ind</span>
@@ -53,7 +57,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
             )}
 
             {/* Apenas Pacientes */}
-            {role === 'patient' && (
+            {activeRole === 'patient' && (
               <li>
                 <a className="flex items-center gap-md px-md py-sm text-on-surface-variant mx-sm hover:bg-surface-variant rounded-full transition-colors" href="#">
                   <span className="material-symbols-outlined">history</span>
@@ -63,7 +67,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
             )}
 
             {/* Apenas Admins */}
-            {role === 'admin' && (
+            {activeRole === 'admin' && (
               <>
                 <li>
                   <a className="flex items-center gap-md px-md py-sm text-on-surface-variant mx-sm hover:bg-surface-variant rounded-full transition-colors" href="#">
@@ -97,11 +101,39 @@ function Dashboard({ onLogout, role }: DashboardProps) {
 
       {/* Main Content Canvas */}
       <main className="flex-1 px-grid-margin py-md mt-16 md:mt-0 max-w-7xl mx-auto w-full">
+        {/* DEV MODE: ROLE SWITCHER */}
+        <div className="mb-6 p-3 bg-amber-100 border border-amber-300 rounded-xl flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2 text-amber-800">
+            <span className="material-symbols-outlined text-[20px]">construction</span>
+            <span className="font-label-sm font-bold uppercase tracking-wider">Modo Desenvolvedor: Alternar Visão</span>
+          </div>
+          <div className="flex bg-white rounded-lg p-1 shadow-sm border border-amber-200">
+            <button 
+              onClick={() => setActiveRole('patient')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeRole === 'patient' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Paciente
+            </button>
+            <button 
+              onClick={() => setActiveRole('professional')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeRole === 'professional' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Terapeuta
+            </button>
+            <button 
+              onClick={() => setActiveRole('admin')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeRole === 'admin' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              Gestão
+            </button>
+          </div>
+        </div>
+
         <div className="mb-lg flex justify-between items-end">
           <div>
             <p className="font-label-md text-on-surface-variant mb-1">Bem-vindo(a)</p>
             <h2 className="font-display-lg text-primary text-5xl">
-              {role === 'patient' ? 'Sua Agenda' : role === 'professional' ? 'Bom dia, Dra. Mariana' : 'Visão Geral (Admin)'}
+              {activeRole === 'patient' ? 'Sua Agenda' : activeRole === 'professional' ? 'Bom dia, Dra. Mariana' : 'Visão Geral (Admin)'}
             </h2>
           </div>
           <div className="hidden md:flex gap-sm">
@@ -179,7 +211,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
         </div>
 
         {/* Conditional Content based on Role */}
-        {role === 'patient' ? (
+        {activeRole === 'patient' ? (
           <div className="mt-8">
             <PatientAgenda />
           </div>
