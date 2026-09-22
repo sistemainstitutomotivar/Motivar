@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Lock, User, Loader2 } from 'lucide-react';
+import { X, Lock, User, Loader2, Mail } from 'lucide-react';
 import type { UserRole } from '../../App';
 import { supabase } from '../../lib/supabase';
 
@@ -8,7 +8,7 @@ interface IntranetLoginProps {
 }
 
 export default function IntranetLogin({ onClose }: IntranetLoginProps) {
-  const [cpf, setCpf] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
 
   const [isRegistering, setIsRegistering] = useState(false);
   const [fullName, setFullName] = useState('');
-  const [emailReal, setEmailReal] = useState('');
+  const [cpf, setCpf] = useState(''); // Mantido apenas para cadastro
 
   const formatCpf = (value: string) => {
     return value
@@ -31,29 +31,31 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
     e.preventDefault();
     setError('');
     
-    const cleanCpf = cpf.replace(/\D/g, '');
-    if (cleanCpf.length !== 11) {
-      setError('Por favor, digite um CPF válido com 11 números.');
-      return;
-    }
-    
-    if (isRegistering && fullName.trim().length < 3) {
-      setError('Por favor, digite seu nome completo.');
-      return;
-    }
-
-    if (isRegistering && (!emailReal.includes('@') || emailReal.length < 5)) {
+    if (!email.includes('@') || email.length < 5) {
       setError('Por favor, digite um e-mail válido.');
       return;
     }
-
+    
     setLoading(true);
 
     try {
       if (isRegistering) {
-        // 1. Cadastrar usuário na Autenticação passando os dados do perfil junto
+        if (fullName.trim().length < 3) {
+          setError('Por favor, digite seu nome completo.');
+          setLoading(false);
+          return;
+        }
+
+        const cleanCpf = cpf.replace(/\D/g, '');
+        if (cleanCpf.length !== 11) {
+          setError('Por favor, digite um CPF válido com 11 números.');
+          setLoading(false);
+          return;
+        }
+
+        // 1. Cadastrar usuário na Autenticação
         const { error: signUpError } = await supabase.auth.signUp({
-          email: emailReal,
+          email: email,
           password: password,
           options: {
             data: {
@@ -66,34 +68,29 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
 
         if (signUpError) throw signUpError;
         
-        // Removemos o insert manual no frontend! 
-        // O banco de dados (via Trigger) vai fazer isso sozinho de forma 100% segura.
-      } else {
-        // Apenas fazer Login usando o CPF
-        // 1. Chamar a função do banco que busca o e-mail atrelado a este CPF
-        const { data: emailData, error: rpcError } = await supabase.rpc('get_email_by_cpf', { cpf_input: cleanCpf });
-        
-        if (rpcError || !emailData) {
-          throw new Error('Invalid login credentials'); // Força erro de credencial se não achar CPF
-        }
+        alert("Conta criada com sucesso! Se você não for logado automaticamente, verifique as configurações de confirmação de e-mail no Supabase.");
+        onClose();
 
-        // 2. Logar com o e-mail retornado
+      } else {
+        // Apenas fazer Login usando o E-MAIL nativamente
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: emailData,
+          email: email,
           password: password,
         });
 
         if (signInError) throw signInError;
+        
+        onClose();
       }
-      
-      onClose();
 
     } catch (err: any) {
       console.error("ERRO COMPLETO:", err);
       if (err.message === 'Invalid login credentials') {
-        setError('CPF ou senha incorretos.');
+        setError('E-mail ou senha incorretos.');
       } else if (err.message === 'User already registered') {
-        setError('Este CPF já está cadastrado.');
+        setError('Este e-mail já está cadastrado.');
+      } else if (err.message === 'Email not confirmed') {
+        setError('Confirme seu e-mail antes de fazer login.');
       } else {
         setError(`Erro técnico: ${err.message || 'Falha na comunicação'}`);
       }
@@ -186,16 +183,17 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
               </div>
 
               <div className="w-full">
-                <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>E-mail (Para recuperação de senha)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>CPF</label>
                 <div className="relative w-full flex items-center">
                   <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
                     <User size={18} />
                   </div>
                   <input 
-                    type="email" 
-                    value={emailReal}
-                    onChange={(e) => setEmailReal(e.target.value)}
-                    placeholder="seu@email.com"
+                    type="text" 
+                    value={cpf}
+                    onChange={(e) => setCpf(formatCpf(e.target.value))}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
                     className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
                     style={{ width: '100%' }}
                   />
@@ -205,17 +203,16 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
           )}
 
           <div className="w-full">
-            <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>CPF</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>E-mail</label>
             <div className="relative w-full flex items-center">
               <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
-                <User size={18} />
+                <Mail size={18} />
               </div>
               <input 
-                type="text" 
-                value={cpf}
-                onChange={(e) => setCpf(formatCpf(e.target.value))}
-                placeholder="000.000.000-00"
-                maxLength={14}
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
                 className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
                 style={{ width: '100%' }}
               />
