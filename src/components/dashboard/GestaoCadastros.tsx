@@ -177,7 +177,7 @@ export default function GestaoCadastros() {
 
       if (editingId) {
         if (activeTab === 'patient') {
-          await supabase.from('clinic_patients').update({
+          const { error: err1 } = await supabase.from('clinic_patients').update({
             name: formData.name,
             mother_name: formData.mother_name,
             mother_contact: formData.mother_contact,
@@ -188,19 +188,19 @@ export default function GestaoCadastros() {
             birthdate: formData.birthdate,
             therapies: formData.therapies,
             avatar_url: uploadedAvatarUrl
-          }).eq('id', editingId);
+          }).eq('id', editingId); if (err1) throw err1;
         } else {
-          await supabase.from('clinic_therapists').update({
+          const { error: err2 } = await supabase.from('clinic_therapists').update({
             name: formData.name,
             specialty: formData.specialty,
             contact: formData.contact,
             cpf: formData.cpf,
             avatar_url: uploadedAvatarUrl
-          }).eq('id', editingId);
+          }).eq('id', editingId); if (err2) throw err2;
         }
       } else {
         if (activeTab === 'patient') {
-          await supabase.from('clinic_patients').insert([{
+          const { error: err3 } = await supabase.from('clinic_patients').insert([{
             name: formData.name,
             mother_name: formData.mother_name,
             mother_contact: formData.mother_contact,
@@ -212,16 +212,16 @@ export default function GestaoCadastros() {
             therapies: formData.therapies || [],
             status: 'active',
             avatar_url: uploadedAvatarUrl
-          }]);
+          }]); if (err3) throw err3;
         } else {
-          await supabase.from('clinic_therapists').insert([{
+          const { error: err4 } = await supabase.from('clinic_therapists').insert([{
             name: formData.name,
             specialty: formData.specialty,
             contact: formData.contact,
             cpf: formData.cpf,
             status: 'active',
             avatar_url: uploadedAvatarUrl
-          }]);
+          }]); if (err4) throw err4;
         }
       }
       
@@ -229,7 +229,7 @@ export default function GestaoCadastros() {
       fetchDbUsers();
     } catch (err) {
       console.error("Erro ao salvar:", err);
-      alert('Erro ao salvar o cadastro. Verifique se as tabelas existem no Supabase.');
+      alert('ERRO DO SUPABASE:\n\n' + (err.message || JSON.stringify(err)) + '\n\n(Tire um print deste erro e mande para o chat)');
     } finally {
       setIsSaving(false);
     }
