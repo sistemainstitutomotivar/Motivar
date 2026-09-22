@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { UserRole } from '../../App';
 import PatientAgenda from './PatientAgenda';
+import GestaoCadastros from './GestaoCadastros';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -10,6 +11,13 @@ interface DashboardProps {
 function Dashboard({ onLogout, role }: DashboardProps) {
   // Estado local para permitir a simulação de telas durante o desenvolvimento
   const [activeRole, setActiveRole] = useState<UserRole>(role || 'admin');
+  const [activeView, setActiveView] = useState<string>('overview');
+
+  // Ajusta a visão se trocar de role
+  const handleRoleChange = (newRole: UserRole) => {
+    setActiveRole(newRole);
+    setActiveView('overview');
+  };
 
   return (
     <div className="text-on-surface font-body-md min-h-screen flex flex-col pb-24 md:pb-0 md:flex-row">
@@ -40,29 +48,29 @@ function Dashboard({ onLogout, role }: DashboardProps) {
           <ul className="flex flex-col gap-1">
             {/* Todos veem o Início */}
             <li>
-              <a className="flex items-center gap-md px-md py-sm bg-primary-container text-on-primary-container rounded-full mx-sm hover:bg-primary-container transition-colors" href="#">
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>dashboard</span>
+              <button onClick={() => setActiveView('overview')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'overview' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
+                <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'overview' ? "'FILL' 1" : "'FILL' 0" }}>dashboard</span>
                 <span className="font-label-md">{activeRole === 'patient' ? 'Minha Agenda' : 'Dashboard'}</span>
-              </a>
+              </button>
             </li>
 
             {/* Apenas Profissionais e Admins */}
             {(activeRole === 'professional' || activeRole === 'admin') && (
               <li>
-                <a className="flex items-center gap-md px-md py-sm text-on-surface-variant mx-sm hover:bg-surface-variant rounded-full transition-colors" href="#">
-                  <span className="material-symbols-outlined">assignment_ind</span>
+                <button onClick={() => setActiveView('pacientes')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'pacientes' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'pacientes' ? "'FILL' 1" : "'FILL' 0" }}>assignment_ind</span>
                   <span className="font-label-md">Meus Pacientes</span>
-                </a>
+                </button>
               </li>
             )}
 
             {/* Apenas Pacientes */}
             {activeRole === 'patient' && (
               <li>
-                <a className="flex items-center gap-md px-md py-sm text-on-surface-variant mx-sm hover:bg-surface-variant rounded-full transition-colors" href="#">
-                  <span className="material-symbols-outlined">history</span>
+                <button onClick={() => setActiveView('historico')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'historico' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'historico' ? "'FILL' 1" : "'FILL' 0" }}>history</span>
                   <span className="font-label-md">Histórico e Evolução</span>
-                </a>
+                </button>
               </li>
             )}
 
@@ -70,22 +78,22 @@ function Dashboard({ onLogout, role }: DashboardProps) {
             {activeRole === 'admin' && (
               <>
                 <li>
-                  <a className="flex items-center gap-md px-md py-sm text-on-surface-variant mx-sm hover:bg-surface-variant rounded-full transition-colors" href="#">
-                    <span className="material-symbols-outlined">payments</span>
+                  <button onClick={() => setActiveView('financeiro')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'financeiro' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
+                    <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'financeiro' ? "'FILL' 1" : "'FILL' 0" }}>payments</span>
                     <span className="font-label-md">Financeiro</span>
-                  </a>
+                  </button>
                 </li>
                 <li>
-                  <a className="flex items-center gap-md px-md py-sm text-on-surface-variant mx-sm hover:bg-surface-variant rounded-full transition-colors" href="#">
-                    <span className="material-symbols-outlined">groups</span>
-                    <span className="font-label-md">Equipe e Terapeutas</span>
-                  </a>
+                  <button onClick={() => setActiveView('cadastros')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'cadastros' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
+                    <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'cadastros' ? "'FILL' 1" : "'FILL' 0" }}>groups</span>
+                    <span className="font-label-md">Gestão de Cadastros</span>
+                  </button>
                 </li>
                 <li>
-                  <a className="flex items-center gap-md px-md py-sm text-on-surface-variant mx-sm hover:bg-surface-variant rounded-full transition-colors" href="#">
-                    <span className="material-symbols-outlined">settings</span>
+                  <button onClick={() => setActiveView('configuracoes')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'configuracoes' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
+                    <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'configuracoes' ? "'FILL' 1" : "'FILL' 0" }}>settings</span>
                     <span className="font-label-md">Configurações</span>
-                  </a>
+                  </button>
                 </li>
               </>
             )}
@@ -109,19 +117,19 @@ function Dashboard({ onLogout, role }: DashboardProps) {
           </div>
           <div className="flex bg-white rounded-lg p-1 shadow-sm border border-amber-200">
             <button 
-              onClick={() => setActiveRole('patient')}
+              onClick={() => handleRoleChange('patient')}
               className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeRole === 'patient' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               Paciente
             </button>
             <button 
-              onClick={() => setActiveRole('professional')}
+              onClick={() => handleRoleChange('professional')}
               className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeRole === 'professional' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               Terapeuta
             </button>
             <button 
-              onClick={() => setActiveRole('admin')}
+              onClick={() => handleRoleChange('admin')}
               className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeRole === 'admin' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               Gestão
@@ -210,8 +218,12 @@ function Dashboard({ onLogout, role }: DashboardProps) {
           </div>
         </div>
 
-        {/* Conditional Content based on Role */}
-        {activeRole === 'patient' ? (
+        {/* Conditional Content based on activeView */}
+        {activeView === 'cadastros' ? (
+          <div className="mt-8">
+            <GestaoCadastros />
+          </div>
+        ) : activeRole === 'patient' ? (
           <div className="mt-8">
             <PatientAgenda />
           </div>
