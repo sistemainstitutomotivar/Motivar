@@ -11,10 +11,12 @@ interface SpecialtyRoomProps {
   description: string;
   imageUrl?: string;
   videoUrl?: string;
-  reverse?: boolean; // Não usaremos mais o reverse neste layout de 3 colunas, mas mantemos para compatibilidade
+  reverse?: boolean;
+  zoomScale?: number;
+  zoomOrigin?: string; // Não usaremos mais o reverse neste layout de 3 colunas, mas mantemos para compatibilidade
 }
 
-export default function SpecialtyRoom({ title, professionalName, description, imageUrl, videoUrl }: SpecialtyRoomProps) {
+export default function SpecialtyRoom({ title, professionalName, description, imageUrl, videoUrl, zoomScale, zoomOrigin }: SpecialtyRoomProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<HTMLImageElement & HTMLVideoElement>(null);
   const leftTextRef = useRef<HTMLDivElement>(null);
@@ -37,8 +39,8 @@ export default function SpecialtyRoom({ title, professionalName, description, im
 
     // Zoom no rosto/busto do profissional (centro superior da imagem)
     tl.to(mediaRef.current, {
-      scale: 1.6,
-      transformOrigin: "50% 25%", 
+      scale: zoomScale || 1.8,
+      transformOrigin: zoomOrigin || "50% 25%", 
       ease: "power1.inOut",
     }, 0);
 

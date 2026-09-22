@@ -10,6 +10,16 @@ export default function LandingPage() {
       <HeroSection />
 
       <div id="especialidades">
+
+        <SpecialtyRoom 
+          title="Psicomotricidade"
+          professionalName="Especialista"
+          description="O corpo e o movimento em harmonia. Nossa sala é preparada para estimular a coordenação motora, o equilíbrio e a consciência corporal, essenciais para o desenvolvimento global."
+          imageUrl="/images/psicomoticidade.jpeg"
+          zoomScale={2.2}
+          zoomOrigin="50% 30%"
+        />
+
         <SpecialtyRoom 
           title="Fonoaudiologia"
           professionalName="Dra. Mariana Silva"

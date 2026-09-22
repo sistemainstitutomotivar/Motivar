@@ -264,7 +264,7 @@ export default function GestaoAgenda() {
             <div className="flex flex-col items-center justify-center h-full py-20 text-center">
               <CalendarIcon size={48} className="text-surface-variant mb-4" />
               <h4 className="font-headline-md text-lg text-on-surface font-bold">Nenhum agendamento encontrado</h4>
-              <p className="font-body-md text-on-surface-variant max-w-sm mt-2">
+              <p className="font-body-md text-on-surface-variant w-full max-w-[384px] mx-auto px-4 mt-2">
                 Não há sessões marcadas para os filtros selecionados nesta data.
               </p>
             </div>

@@ -144,7 +144,7 @@ export default function TherapistDashboard() {
             <div className="flex-1 flex flex-col items-center justify-center text-center text-on-surface-variant border-2 border-dashed border-surface-variant rounded-2xl p-8 bg-slate-50">
               <FileText size={48} className="mb-4 text-slate-300" />
               <h4 className="font-headline-md text-lg font-bold text-slate-700 mb-2">Nenhum documento recente</h4>
-              <p className="font-body-md text-slate-500 max-w-sm">
+              <p className="font-body-md text-slate-500 w-full max-w-[384px] mx-auto px-4 mt-2">
                 Faça o upload de laudos, evoluções, relatórios e outros documentos referentes ao paciente.
               </p>
             </div>
