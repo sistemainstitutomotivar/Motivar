@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { UserRole } from '../../App';
 import PatientAgenda from './PatientAgenda';
 import GestaoCadastros from './GestaoCadastros';
+import TherapistDashboard from './TherapistDashboard';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -178,47 +179,49 @@ function Dashboard({ onLogout, role }: DashboardProps) {
           </div>
         </div>
 
-        {/* Horizontal Scroll Summary Cards */}
-        <div className="flex overflow-x-auto hide-scrollbar gap-grid-gutter pb-4 mb-8 -mx-grid-margin px-grid-margin md:mx-0 md:px-0">
-          <div className="glass-card rounded-2xl p-md flex-shrink-0 w-[280px] border-l-4 border-l-secondary flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-6">
-              <div className="bg-secondary-fixed p-2 rounded-xl">
-                <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
+        {/* Horizontal Scroll Summary Cards - ONLY FOR ADMIN */}
+        {activeRole === 'admin' && (
+          <div className="flex overflow-x-auto hide-scrollbar gap-grid-gutter pb-4 mb-8 -mx-grid-margin px-grid-margin md:mx-0 md:px-0">
+            <div className="glass-card rounded-2xl p-md flex-shrink-0 w-[280px] border-l-4 border-l-secondary flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-6">
+                <div className="bg-secondary-fixed p-2 rounded-xl">
+                  <span className="material-symbols-outlined text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>calendar_month</span>
+                </div>
+                <span className="font-label-sm text-secondary bg-secondary-fixed-dim px-3 py-1 rounded-full">Hoje</span>
               </div>
-              <span className="font-label-sm text-secondary bg-secondary-fixed-dim px-3 py-1 rounded-full">Hoje</span>
+              <div>
+                <h3 className="font-headline-md text-on-surface text-[40px] leading-tight font-bold">42</h3>
+                <p className="font-body-md text-on-surface-variant font-medium mt-1">Sessões Agendadas</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-headline-md text-on-surface text-[40px] leading-tight font-bold">42</h3>
-              <p className="font-body-md text-on-surface-variant font-medium mt-1">Sessões Agendadas</p>
+            <div className="glass-card rounded-2xl p-md flex-shrink-0 w-[280px] border-l-4 border-l-tertiary flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-6">
+                <div className="bg-tertiary-fixed p-2 rounded-xl">
+                  <span className="material-symbols-outlined text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>child_care</span>
+                </div>
+                <span className="font-label-sm text-tertiary bg-tertiary-fixed-dim px-3 py-1 rounded-full">+3 novos</span>
+              </div>
+              <div>
+                <h3 className="font-headline-md text-on-surface text-[40px] leading-tight font-bold">38</h3>
+                <p className="font-body-md text-on-surface-variant font-medium mt-1">Pacientes Previstos</p>
+              </div>
+            </div>
+            <div className="glass-card rounded-2xl p-md flex-shrink-0 w-[280px] border-l-4 border-l-primary flex flex-col justify-between">
+              <div className="flex justify-between items-start mb-6">
+                <div className="bg-primary-fixed p-2 rounded-xl">
+                  <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>chat</span>
+                </div>
+                <span className="font-label-sm text-primary bg-primary-fixed-dim px-3 py-1 rounded-full">Automático</span>
+              </div>
+              <div>
+                <h3 className="font-headline-md text-on-surface text-[40px] leading-tight font-bold">156</h3>
+                <p className="font-body-md text-on-surface-variant font-medium mt-1">Mensagens Enviadas</p>
+              </div>
             </div>
           </div>
-          <div className="glass-card rounded-2xl p-md flex-shrink-0 w-[280px] border-l-4 border-l-tertiary flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-6">
-              <div className="bg-tertiary-fixed p-2 rounded-xl">
-                <span className="material-symbols-outlined text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>child_care</span>
-              </div>
-              <span className="font-label-sm text-tertiary bg-tertiary-fixed-dim px-3 py-1 rounded-full">+3 novos</span>
-            </div>
-            <div>
-              <h3 className="font-headline-md text-on-surface text-[40px] leading-tight font-bold">38</h3>
-              <p className="font-body-md text-on-surface-variant font-medium mt-1">Pacientes Previstos</p>
-            </div>
-          </div>
-          <div className="glass-card rounded-2xl p-md flex-shrink-0 w-[280px] border-l-4 border-l-primary flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-6">
-              <div className="bg-primary-fixed p-2 rounded-xl">
-                <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>chat</span>
-              </div>
-              <span className="font-label-sm text-primary bg-primary-fixed-dim px-3 py-1 rounded-full">Automático</span>
-            </div>
-            <div>
-              <h3 className="font-headline-md text-on-surface text-[40px] leading-tight font-bold">156</h3>
-              <p className="font-body-md text-on-surface-variant font-medium mt-1">Mensagens Enviadas</p>
-            </div>
-          </div>
-        </div>
+        )}
 
-        {/* Conditional Content based on activeView */}
+        {/* Conditional Content based on activeView & activeRole */}
         {activeView === 'cadastros' ? (
           <div className="mt-8">
             <GestaoCadastros />
@@ -226,6 +229,10 @@ function Dashboard({ onLogout, role }: DashboardProps) {
         ) : activeRole === 'patient' ? (
           <div className="mt-8">
             <PatientAgenda />
+          </div>
+        ) : activeRole === 'professional' ? (
+          <div className="mt-8">
+            <TherapistDashboard />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-12 gap-grid-gutter">
