@@ -3,6 +3,7 @@ import { Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, C
 
 interface MasterAppointment {
   id: string;
+  date: string;
   time: string;
   patientName: string;
   therapistName: string;
@@ -11,16 +12,57 @@ interface MasterAppointment {
   justification?: string;
 }
 
+// Auxiliares para datas relativas no Mock
+const today = new Date();
+const tomorrow = new Date(today);
+tomorrow.setDate(tomorrow.getDate() + 1);
+const yesterday = new Date(today);
+yesterday.setDate(yesterday.getDate() - 1);
+
+const formatYMD = (d: Date) => d.toISOString().split('T')[0];
+
 const mockAppointments: MasterAppointment[] = [
-  { id: '1', time: '08:00', patientName: 'Pedro Henrique', therapistName: 'Dra. Mariana Costa', room: 'Sala 01', status: 'confirmed' },
-  { id: '2', time: '09:00', patientName: 'Lucas Matheus Silva', therapistName: 'Dr. Roberto Alves', room: 'Sala 04', status: 'pending' },
-  { id: '3', time: '10:00', patientName: 'Ana Júlia', therapistName: 'Dra. Mariana Costa', room: 'Sala 01', status: 'cancelled', justification: 'Paciente amanheceu com febre.' },
-  { id: '4', time: '11:00', patientName: 'Marcos Vinícius', therapistName: 'Dr. João Silva', room: 'Sala 02', status: 'confirmed' },
+  { id: '1', date: formatYMD(today), time: '08:00', patientName: 'Pedro Henrique', therapistName: 'Dra. Mariana Costa', room: 'Sala 01', status: 'confirmed' },
+  { id: '2', date: formatYMD(today), time: '09:00', patientName: 'Lucas Matheus Silva', therapistName: 'Dr. Roberto Alves', room: 'Sala 04', status: 'pending' },
+  { id: '3', date: formatYMD(today), time: '10:00', patientName: 'Ana Júlia', therapistName: 'Dra. Mariana Costa', room: 'Sala 01', status: 'cancelled', justification: 'Paciente amanheceu com febre.' },
+  { id: '4', date: formatYMD(tomorrow), time: '11:00', patientName: 'Marcos Vinícius', therapistName: 'Dra. Mariana Costa', room: 'Sala 02', status: 'confirmed' },
+  { id: '5', date: formatYMD(yesterday), time: '14:00', patientName: 'Fernanda Lima', therapistName: 'Dr. Roberto Alves', room: 'Sala 03', status: 'confirmed' },
 ];
 
 export default function GestaoAgenda() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState('Todos os Terapeutas');
+  
+  // Estados dos Filtros
+  const [selectedDate, setSelectedDate] = useState<Date>(today);
+  const [therapistFilter, setTherapistFilter] = useState('Todos os Terapeutas');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Lógica de manipulação de data
+  const handlePrevDay = () => {
+    const prev = new Date(selectedDate);
+    prev.setDate(prev.getDate() - 1);
+    setSelectedDate(prev);
+  };
+
+  const handleNextDay = () => {
+    const next = new Date(selectedDate);
+    next.setDate(next.getDate() + 1);
+    setSelectedDate(next);
+  };
+
+  const formatDateDisplay = (d: Date) => {
+    const isToday = formatYMD(d) === formatYMD(new Date());
+    const dateStr = d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' });
+    return isToday ? `Hoje, ${dateStr}` : dateStr;
+  };
+
+  // Aplicação dos Filtros
+  const filteredAppointments = mockAppointments.filter(apt => {
+    const matchesDate = apt.date === formatYMD(selectedDate);
+    const matchesTherapist = therapistFilter === 'Todos os Terapeutas' || apt.therapistName === therapistFilter;
+    const matchesSearch = apt.patientName.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesDate && matchesTherapist && matchesSearch;
+  });
 
   return (
     <div className="w-full flex flex-col gap-6">
@@ -41,49 +83,51 @@ export default function GestaoAgenda() {
       </div>
 
       {/* CONTROLS */}
-      <div className="flex flex-col md:flex-row justify-between gap-4 items-center bg-white p-4 rounded-2xl border border-surface-variant shadow-sm">
+      <div className="flex flex-col xl:flex-row justify-between gap-4 items-center bg-white p-4 rounded-2xl border border-surface-variant shadow-sm">
         
-        {/* Date Selector (Visual Mock) */}
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <button className="p-2 hover:bg-surface-variant rounded-full text-on-surface-variant transition-colors">
+        {/* Date Selector */}
+        <div className="flex items-center justify-between w-full xl:w-auto gap-4 bg-surface-container-lowest border border-surface-variant rounded-xl p-1">
+          <button onClick={handlePrevDay} className="p-2 hover:bg-surface-variant rounded-lg text-on-surface-variant transition-colors">
             <span className="material-symbols-outlined">chevron_left</span>
           </button>
-          <div className="flex items-center gap-2 text-primary font-bold">
+          <div className="flex items-center gap-2 text-primary font-bold px-4">
             <CalendarIcon size={20} />
-            <span>Hoje, 22 de Setembro</span>
+            <span className="whitespace-nowrap min-w-[160px] text-center">{formatDateDisplay(selectedDate)}</span>
           </div>
-          <button className="p-2 hover:bg-surface-variant rounded-full text-on-surface-variant transition-colors">
+          <button onClick={handleNextDay} className="p-2 hover:bg-surface-variant rounded-lg text-on-surface-variant transition-colors">
             <span className="material-symbols-outlined">chevron_right</span>
           </button>
         </div>
 
         {/* Filters & Search */}
-        <div className="flex w-full md:w-auto gap-3">
-          <div className="relative flex-1 md:w-48">
+        <div className="flex flex-col md:flex-row w-full xl:w-auto gap-3">
+          <div className="relative flex-1 md:w-64">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" size={16} />
             <select 
-              value={selectedFilter}
-              onChange={(e) => setSelectedFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-surface-variant rounded-xl focus:ring-2 focus:ring-primary outline-none font-body-sm text-on-surface appearance-none"
+              value={therapistFilter}
+              onChange={(e) => setTherapistFilter(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-surface-variant rounded-xl focus:ring-2 focus:ring-primary outline-none font-body-sm text-on-surface appearance-none"
             >
               <option>Todos os Terapeutas</option>
               <option>Dra. Mariana Costa</option>
               <option>Dr. Roberto Alves</option>
             </select>
           </div>
-          <div className="relative flex-1 md:w-56">
+          <div className="relative flex-1 md:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" size={16} />
             <input 
               type="text" 
               placeholder="Buscar paciente..." 
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-surface-variant rounded-xl focus:ring-2 focus:ring-primary outline-none font-body-sm text-on-surface"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-surface-variant rounded-xl focus:ring-2 focus:ring-primary outline-none font-body-sm text-on-surface"
             />
           </div>
         </div>
       </div>
 
       {/* TIMELINE / LIST VIEW */}
-      <div className="bg-white rounded-3xl border border-surface-variant shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white rounded-3xl border border-surface-variant shadow-sm overflow-hidden flex flex-col min-h-[400px]">
         {/* Table Header */}
         <div className="grid grid-cols-12 gap-4 p-4 bg-surface-container-lowest border-b border-surface-variant font-label-sm font-bold text-on-surface-variant uppercase tracking-wider hidden md:grid">
           <div className="col-span-1 text-center">Hora</div>
@@ -94,51 +138,61 @@ export default function GestaoAgenda() {
         </div>
 
         {/* Table Body */}
-        <div className="divide-y divide-surface-variant">
-          {mockAppointments.map((apt) => (
-            <div key={apt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-surface-variant/10 transition-colors">
-              <div className="col-span-1 font-headline-md font-bold text-on-surface flex items-center justify-center bg-surface-variant/30 py-2 rounded-lg">
-                {apt.time}
-              </div>
-              
-              <div className="col-span-3 flex flex-col">
-                <span className="font-label-md font-bold text-on-surface">{apt.patientName}</span>
-                <span className="md:hidden font-body-sm text-on-surface-variant">Paciente</span>
-              </div>
-              
-              <div className="col-span-3 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold text-xs">
-                  {apt.therapistName.charAt(apt.therapistName.indexOf(' ') + 1)}
+        <div className="divide-y divide-surface-variant flex-1">
+          {filteredAppointments.length > 0 ? (
+            filteredAppointments.map((apt) => (
+              <div key={apt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-surface-variant/10 transition-colors">
+                <div className="col-span-1 font-headline-md font-bold text-on-surface flex items-center justify-center bg-surface-variant/30 py-2 rounded-lg">
+                  {apt.time}
                 </div>
-                <span className="font-body-md text-on-surface-variant">{apt.therapistName}</span>
-              </div>
-              
-              <div className="col-span-2 font-body-md text-on-surface-variant flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">room</span>
-                {apt.room}
-              </div>
-              
-              <div className="col-span-3 flex flex-col items-start gap-1">
-                <div className={`px-3 py-1.5 rounded-full font-label-sm flex items-center gap-1.5 w-fit ${
-                  apt.status === 'confirmed' ? 'bg-[#cce5ff] text-[#00497d]' : 
-                  apt.status === 'cancelled' ? 'bg-error-container text-on-error-container' : 
-                  'bg-secondary-container text-on-secondary-container'
-                }`}>
-                  {apt.status === 'confirmed' && <CheckCircle size={14} />}
-                  {apt.status === 'pending' && <Clock size={14} />}
-                  {apt.status === 'cancelled' && <XCircle size={14} />}
-                  
-                  {apt.status === 'confirmed' ? 'Confirmado' : 
-                   apt.status === 'cancelled' ? 'Cancelado' : 'Aguardando'}
+                
+                <div className="col-span-3 flex flex-col">
+                  <span className="font-label-md font-bold text-on-surface">{apt.patientName}</span>
+                  <span className="md:hidden font-body-sm text-on-surface-variant">Paciente</span>
                 </div>
-                {apt.status === 'cancelled' && apt.justification && (
-                  <span className="text-xs text-error font-medium truncate w-full" title={apt.justification}>
-                    Motivo: {apt.justification}
-                  </span>
-                )}
+                
+                <div className="col-span-3 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold text-xs">
+                    {apt.therapistName.charAt(apt.therapistName.indexOf(' ') + 1)}
+                  </div>
+                  <span className="font-body-md text-on-surface-variant">{apt.therapistName}</span>
+                </div>
+                
+                <div className="col-span-2 font-body-md text-on-surface-variant flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[16px]">room</span>
+                  {apt.room}
+                </div>
+                
+                <div className="col-span-3 flex flex-col items-start gap-1">
+                  <div className={`px-3 py-1.5 rounded-full font-label-sm flex items-center gap-1.5 w-fit ${
+                    apt.status === 'confirmed' ? 'bg-[#dcfce7] text-[#15803d]' : 
+                    apt.status === 'cancelled' ? 'bg-error-container text-on-error-container' : 
+                    'bg-secondary-container text-on-secondary-container'
+                  }`}>
+                    {apt.status === 'confirmed' && <CheckCircle size={14} />}
+                    {apt.status === 'pending' && <Clock size={14} />}
+                    {apt.status === 'cancelled' && <XCircle size={14} />}
+                    
+                    {apt.status === 'confirmed' ? 'Confirmado' : 
+                     apt.status === 'cancelled' ? 'Cancelado' : 'Aguardando'}
+                  </div>
+                  {apt.status === 'cancelled' && apt.justification && (
+                    <span className="text-xs text-error font-medium truncate w-full" title={apt.justification}>
+                      Motivo: {apt.justification}
+                    </span>
+                  )}
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full py-20 text-center">
+              <CalendarIcon size={48} className="text-surface-variant mb-4" />
+              <h4 className="font-headline-md text-lg text-on-surface font-bold">Nenhum agendamento encontrado</h4>
+              <p className="font-body-md text-on-surface-variant max-w-sm mt-2">
+                Não há sessões marcadas para os filtros selecionados nesta data.
+              </p>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
