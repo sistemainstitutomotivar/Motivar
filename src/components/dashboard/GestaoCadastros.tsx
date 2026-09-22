@@ -7,8 +7,12 @@ interface MockUser {
   id: string;
   name: string;
   role: 'patient' | 'professional';
-  specialtyOrResponsible?: string;
-  contact: string;
+  specialty?: string;
+  mother_name?: string;
+  mother_contact?: string;
+  father_name?: string;
+  father_contact?: string;
+  contact: string; // Contato principal ou do terapeuta
   status: 'active' | 'inactive';
   cpf?: string;
   birthdate?: string;
@@ -16,12 +20,12 @@ interface MockUser {
   avatar_url?: string;
 }
 
-// Dados Fictícios Fixos (Mantidos conforme solicitado)
+// Dados Fictícios Fixos
 const initialUsers: MockUser[] = [
-  { id: '1', name: 'Lucas Matheus Silva', role: 'patient', specialtyOrResponsible: 'Maria Silva (Mãe)', contact: '(11) 98888-7777', status: 'active', therapies: ['Psicologia', 'Fonoaudiologia'] },
-  { id: '2', name: 'Pedro Henrique', role: 'patient', specialtyOrResponsible: 'João Henrique (Pai)', contact: '(11) 97777-6666', status: 'active', therapies: ['Terapia Ocupacional'] },
-  { id: '3', name: 'Dra. Mariana Costa', role: 'professional', specialtyOrResponsible: 'Psicologia', contact: '(11) 96666-5555', status: 'active' },
-  { id: '4', name: 'Dr. Roberto Alves', role: 'professional', specialtyOrResponsible: 'Fonoaudiologia', contact: '(11) 95555-4444', status: 'active' },
+  { id: '1', name: 'Lucas Matheus Silva', role: 'patient', mother_name: 'Maria Silva (Mãe)', contact: '(11) 98888-7777', status: 'active', therapies: ['Psicologia', 'Fonoaudiologia'] },
+  { id: '2', name: 'Pedro Henrique', role: 'patient', father_name: 'João Henrique (Pai)', contact: '(11) 97777-6666', status: 'active', therapies: ['Terapia Ocupacional'] },
+  { id: '3', name: 'Dra. Mariana Costa', role: 'professional', specialty: 'Psicologia', contact: '(11) 96666-5555', status: 'active' },
+  { id: '4', name: 'Dr. Roberto Alves', role: 'professional', specialty: 'Fonoaudiologia', contact: '(11) 95555-4444', status: 'active' },
 ];
 
 export default function GestaoCadastros() {
@@ -51,7 +55,10 @@ export default function GestaoCadastros() {
           id: d.id,
           name: d.name,
           role: 'patient',
-          specialtyOrResponsible: d.responsible_name,
+          mother_name: d.mother_name,
+          mother_contact: d.mother_contact,
+          father_name: d.father_name,
+          father_contact: d.father_contact,
           contact: d.contact,
           status: d.status,
           cpf: d.cpf,
@@ -70,7 +77,7 @@ export default function GestaoCadastros() {
           id: d.id,
           name: d.name,
           role: 'professional',
-          specialtyOrResponsible: d.specialty,
+          specialty: d.specialty,
           contact: d.contact,
           status: d.status,
           cpf: d.cpf,
@@ -83,7 +90,6 @@ export default function GestaoCadastros() {
     }
   };
 
-  // Combina os dados fictícios (mantidos) com os dados reais do banco
   const allUsers = [...initialUsers, ...dbUsers];
   const filteredUsers = allUsers.filter(u => u.role === activeTab && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -99,7 +105,7 @@ export default function GestaoCadastros() {
       } else {
         await supabase.from('clinic_therapists').delete().eq('id', id);
       }
-      fetchDbUsers(); // Atualiza a lista após excluir
+      fetchDbUsers();
     }
   };
 
@@ -140,11 +146,10 @@ export default function GestaoCadastros() {
       
       let uploadedAvatarUrl = formData.avatar_url;
 
-      // 1. Lidar com o Upload e Compressão da Imagem
       if (avatarFile) {
         try {
           const options = {
-            maxSizeMB: 0.2, // Máximo de 200KB para avatares (ótima compressão)
+            maxSizeMB: 0.2,
             maxWidthOrHeight: 800,
             useWebWorker: true
           };
@@ -166,17 +171,18 @@ export default function GestaoCadastros() {
           uploadedAvatarUrl = publicUrlData.publicUrl;
         } catch (imgError) {
           console.error("Erro ao comprimir/subir imagem:", imgError);
-          alert('Houve um erro ao enviar a imagem, mas o cadastro será salvo mesmo assim.');
+          alert('Houve um erro ao enviar a imagem (verifique se o bucket "avatars" foi criado e está público no Supabase). O cadastro será salvo sem foto.');
         }
       }
 
-      // 2. Salvar no Banco de Dados
       if (editingId) {
-        // Atualizar
         if (activeTab === 'patient') {
           await supabase.from('clinic_patients').update({
             name: formData.name,
-            responsible_name: formData.specialtyOrResponsible,
+            mother_name: formData.mother_name,
+            mother_contact: formData.mother_contact,
+            father_name: formData.father_name,
+            father_contact: formData.father_contact,
             contact: formData.contact,
             cpf: formData.cpf,
             birthdate: formData.birthdate,
@@ -186,18 +192,20 @@ export default function GestaoCadastros() {
         } else {
           await supabase.from('clinic_therapists').update({
             name: formData.name,
-            specialty: formData.specialtyOrResponsible,
+            specialty: formData.specialty,
             contact: formData.contact,
             cpf: formData.cpf,
             avatar_url: uploadedAvatarUrl
           }).eq('id', editingId);
         }
       } else {
-        // Inserir novo
         if (activeTab === 'patient') {
           await supabase.from('clinic_patients').insert([{
             name: formData.name,
-            responsible_name: formData.specialtyOrResponsible,
+            mother_name: formData.mother_name,
+            mother_contact: formData.mother_contact,
+            father_name: formData.father_name,
+            father_contact: formData.father_contact,
             contact: formData.contact,
             cpf: formData.cpf,
             birthdate: formData.birthdate,
@@ -208,7 +216,7 @@ export default function GestaoCadastros() {
         } else {
           await supabase.from('clinic_therapists').insert([{
             name: formData.name,
-            specialty: formData.specialtyOrResponsible,
+            specialty: formData.specialty,
             contact: formData.contact,
             cpf: formData.cpf,
             status: 'active',
@@ -218,10 +226,10 @@ export default function GestaoCadastros() {
       }
       
       setIsModalOpen(false);
-      fetchDbUsers(); // Busca os dados atualizados do Supabase
+      fetchDbUsers();
     } catch (err) {
       console.error("Erro ao salvar:", err);
-      alert('Erro ao salvar o cadastro.');
+      alert('Erro ao salvar o cadastro. Verifique se as tabelas existem no Supabase.');
     } finally {
       setIsSaving(false);
     }
@@ -298,7 +306,6 @@ export default function GestaoCadastros() {
                   <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider">Terapias</th>
                 )}
                 <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider">Contato</th>
-                <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider">Status</th>
                 <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
@@ -320,7 +327,9 @@ export default function GestaoCadastros() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-body-md text-on-surface-variant">{user.specialtyOrResponsible}</td>
+                  <td className="px-6 py-4 font-body-md text-on-surface-variant">
+                    {user.role === 'patient' ? (user.mother_name || user.father_name || 'Não informado') : user.specialty}
+                  </td>
                   {activeTab === 'patient' && (
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
@@ -333,11 +342,6 @@ export default function GestaoCadastros() {
                     </td>
                   )}
                   <td className="px-6 py-4 font-body-md text-on-surface-variant">{user.contact}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full font-label-sm ${user.status === 'active' ? 'bg-[#cce5ff] text-[#00497d]' : 'bg-surface-variant text-on-surface-variant'}`}>
-                      {user.status === 'active' ? 'Ativo' : 'Inativo'}
-                    </span>
-                  </td>
                   <td className="px-6 py-4 text-right">
                     <button onClick={() => handleEdit(user)} className="p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-surface-variant/50">
                       <Edit size={18} />
@@ -362,7 +366,7 @@ export default function GestaoCadastros() {
       {/* REGISTRATION MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-[600px] shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-[650px] shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
             <button 
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full z-10"
@@ -375,7 +379,7 @@ export default function GestaoCadastros() {
               {editingId ? 'Editar' : 'Cadastrar Novo'} {activeTab === 'patient' ? 'Paciente' : 'Terapeuta'}
             </h3>
             
-            <form className="space-y-5" onSubmit={handleSave}>
+            <form className="space-y-6" onSubmit={handleSave}>
               
               {/* ÁREA DE FOTO DE PERFIL */}
               <div className="flex flex-col items-center justify-center mb-6">
@@ -394,75 +398,104 @@ export default function GestaoCadastros() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
-                  <input required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: João da Silva" disabled={isSaving} />
+              {/* DADOS GERAIS */}
+              <div>
+                <h4 className="text-sm font-bold text-primary mb-3 border-b border-surface-variant pb-2">Dados Pessoais</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
+                    <input required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: João da Silva" disabled={isSaving} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">CPF</label>
+                    <input value={formData.cpf || ''} onChange={e => setFormData({...formData, cpf: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="000.000.000-00" disabled={isSaving} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Data de Nascimento</label>
+                    <input value={formData.birthdate || ''} onChange={e => setFormData({...formData, birthdate: e.target.value})} type="date" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" disabled={isSaving} />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">CPF</label>
-                  <input value={formData.cpf || ''} onChange={e => setFormData({...formData, cpf: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="000.000.000-00" disabled={isSaving} />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Data de Nascimento</label>
-                  <input value={formData.birthdate || ''} onChange={e => setFormData({...formData, birthdate: e.target.value})} type="date" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" disabled={isSaving} />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Celular / WhatsApp</label>
-                  <input required value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
-                </div>
+              </div>
 
-                {activeTab === 'patient' ? (
-                  <>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Nome do Responsável (se menor)</label>
-                      <input value={formData.specialtyOrResponsible || ''} onChange={e => setFormData({...formData, specialtyOrResponsible: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Nome da mãe, pai ou tutor" disabled={isSaving} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-bold text-slate-700 mb-2">Terapias / Especialidades Indicadas</label>
-                      <div className="flex flex-wrap gap-2">
-                        {therapyOptions.map(therapy => {
-                          const isSelected = formData.therapies?.includes(therapy);
-                          return (
-                            <button
-                              key={therapy}
-                              type="button"
-                              disabled={isSaving}
-                              onClick={() => toggleTherapy(therapy)}
-                              className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-colors ${
-                                isSelected 
-                                  ? 'bg-primary text-white border-primary shadow-sm' 
-                                  : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
-                              } disabled:opacity-50`}
-                            >
-                              {therapy}
-                            </button>
-                          );
-                        })}
+              {activeTab === 'patient' ? (
+                <>
+                  <div>
+                    <h4 className="text-sm font-bold text-primary mb-3 border-b border-surface-variant pb-2">Filiação / Responsáveis</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Nome da Mãe (ou Resp.)</label>
+                        <input value={formData.mother_name || ''} onChange={e => setFormData({...formData, mother_name: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" disabled={isSaving} />
                       </div>
-                      <p className="text-xs text-slate-500 mt-2">
-                        As terapias selecionadas direcionarão o paciente automaticamente para a lista dos respectivos profissionais.
-                      </p>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Telefone da Mãe/Resp.</label>
+                        <input value={formData.mother_contact || ''} onChange={e => setFormData({...formData, mother_contact: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Nome do Pai</label>
+                        <input value={formData.father_name || ''} onChange={e => setFormData({...formData, father_name: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" disabled={isSaving} />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Telefone do Pai</label>
+                        <input value={formData.father_contact || ''} onChange={e => setFormData({...formData, father_contact: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-slate-700 mb-1">Outro Contato / Fixo</label>
+                        <input value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
+                      </div>
                     </div>
-                  </>
-                ) : (
-                  <>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-bold text-primary mb-3 border-b border-surface-variant pb-2">Terapias Indicadas</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {therapyOptions.map(therapy => {
+                        const isSelected = formData.therapies?.includes(therapy);
+                        return (
+                          <button
+                            key={therapy}
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => toggleTherapy(therapy)}
+                            className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-colors ${
+                              isSelected 
+                                ? 'bg-primary text-white border-primary shadow-sm' 
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
+                            } disabled:opacity-50`}
+                          >
+                            {therapy}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-2">
+                      As terapias selecionadas direcionarão o paciente automaticamente para a lista dos respectivos profissionais.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <h4 className="text-sm font-bold text-primary mb-3 border-b border-surface-variant pb-2">Dados Profissionais</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1">Especialidade</label>
-                      <select required value={formData.specialtyOrResponsible || ''} onChange={e => setFormData({...formData, specialtyOrResponsible: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600 appearance-none" disabled={isSaving}>
+                      <select required value={formData.specialty || ''} onChange={e => setFormData({...formData, specialty: e.target.value})} className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600 appearance-none" disabled={isSaving}>
                         <option value="">Selecione...</option>
                         {therapyOptions.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1">Registro (CRM/CRP/etc)</label>
-                      <input type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: CRP 00/00000" disabled={isSaving} />
+                      <input type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: CRP 00/00000" disabled={isSaving} />
                     </div>
-                  </>
-                )}
-              </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Celular (Contato)</label>
+                      <input required value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              <div className="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100 mt-6">
+              <div className="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100 mt-2">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto px-6 py-3 sm:py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors" disabled={isSaving}>
                   Cancelar
                 </button>
