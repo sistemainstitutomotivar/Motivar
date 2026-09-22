@@ -127,7 +127,7 @@ export default function GestaoCadastros() {
       {/* REGISTRATION MODAL (DRAFT) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 w-[95vw] sm:w-full max-w-2xl shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-[600px] shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
             <button 
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full z-10"
