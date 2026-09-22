@@ -507,7 +507,7 @@ export default function GestaoCadastros() {
                       Salvando...
                     </>
                   ) : (
-                    editingId ? 'Atualizar Cadastro' : 'Salvar no Banco'
+                    editingId ? 'Atualizar Cadastro' : 'Salvar'
                   )}
                 </button>
               </div>
