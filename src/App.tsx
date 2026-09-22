@@ -37,17 +37,23 @@ function App() {
   // Busca qual é o nível de acesso (role) do usuário na tabela profiles
   const fetchUserRole = async (userId: string) => {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
         .single();
         
-      if (data) {
+      if (data && data.role) {
         setUserRole(data.role as UserRole);
+      } else {
+        throw new Error('Perfil não encontrado na tabela profiles');
       }
     } catch (err) {
-      console.error("Erro ao buscar perfil:", err);
+      console.warn("Aviso (buscando perfil):", err);
+      // Fallback de segurança: se a tabela profiles falhar (ex: Trigger não rodou), pega o role direto dos metadados
+      const { data: { user } } = await supabase.auth.getUser();
+      const fallbackRole = user?.user_metadata?.role || 'patient';
+      setUserRole(fallbackRole as UserRole);
     } finally {
       setLoading(false);
     }
