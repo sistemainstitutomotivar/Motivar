@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Search, Edit, Trash2, X } from 'lucide-react';
+import { UserPlus, Search, Edit, Trash2, X, Camera } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import imageCompression from 'browser-image-compression';
 
 interface MockUser {
   id: string;
@@ -12,6 +13,7 @@ interface MockUser {
   cpf?: string;
   birthdate?: string;
   therapies?: string[]; // Para pacientes
+  avatar_url?: string;
 }
 
 // Dados Fictícios Fixos (Mantidos conforme solicitado)
@@ -26,6 +28,7 @@ export default function GestaoCadastros() {
   const [activeTab, setActiveTab] = useState<'patient' | 'professional'>('patient');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   
   // State for Users fetched from Supabase
   const [dbUsers, setDbUsers] = useState<MockUser[]>([]);
@@ -33,6 +36,8 @@ export default function GestaoCadastros() {
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<MockUser>>({});
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   useEffect(() => {
     fetchDbUsers();
@@ -51,7 +56,8 @@ export default function GestaoCadastros() {
           status: d.status,
           cpf: d.cpf,
           birthdate: d.birthdate,
-          therapies: d.therapies
+          therapies: d.therapies,
+          avatar_url: d.avatar_url
         } as MockUser));
         setDbUsers(formatted);
       } else if (error) {
@@ -68,6 +74,7 @@ export default function GestaoCadastros() {
           contact: d.contact,
           status: d.status,
           cpf: d.cpf,
+          avatar_url: d.avatar_url
         } as MockUser));
         setDbUsers(formatted);
       } else if (error) {
@@ -99,67 +106,125 @@ export default function GestaoCadastros() {
   const handleEdit = (user: MockUser) => {
     setFormData(user);
     setEditingId(user.id);
+    setAvatarFile(null);
+    setAvatarPreview(null);
     setIsModalOpen(true);
   };
 
   const handleOpenNew = () => {
     setFormData({ role: activeTab, therapies: [] });
     setEditingId(null);
+    setAvatarFile(null);
+    setAvatarPreview(null);
     setIsModalOpen(true);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarPreview(URL.createObjectURL(file));
+      setAvatarFile(file);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     
-    if (editingId) {
-      if (editingId.length < 10) {
+    try {
+      if (editingId && editingId.length < 10) {
         alert('Não é possível editar usuários de demonstração. Eles são apenas para visualização.');
+        setIsSaving(false);
         return;
       }
       
-      // Atualizar no banco de dados
-      if (activeTab === 'patient') {
-        await supabase.from('clinic_patients').update({
-          name: formData.name,
-          responsible_name: formData.specialtyOrResponsible,
-          contact: formData.contact,
-          cpf: formData.cpf,
-          birthdate: formData.birthdate,
-          therapies: formData.therapies
-        }).eq('id', editingId);
-      } else {
-        await supabase.from('clinic_therapists').update({
-          name: formData.name,
-          specialty: formData.specialtyOrResponsible,
-          contact: formData.contact,
-          cpf: formData.cpf,
-        }).eq('id', editingId);
+      let uploadedAvatarUrl = formData.avatar_url;
+
+      // 1. Lidar com o Upload e Compressão da Imagem
+      if (avatarFile) {
+        try {
+          const options = {
+            maxSizeMB: 0.2, // Máximo de 200KB para avatares (ótima compressão)
+            maxWidthOrHeight: 800,
+            useWebWorker: true
+          };
+          const compressedFile = await imageCompression(avatarFile, options);
+          
+          const fileExt = compressedFile.name.split('.').pop() || 'jpg';
+          const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(fileName, compressedFile);
+            
+          if (uploadError) throw uploadError;
+          
+          const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(fileName);
+            
+          uploadedAvatarUrl = publicUrlData.publicUrl;
+        } catch (imgError) {
+          console.error("Erro ao comprimir/subir imagem:", imgError);
+          alert('Houve um erro ao enviar a imagem, mas o cadastro será salvo mesmo assim.');
+        }
       }
-    } else {
-      // Inserir novo no banco de dados
-      if (activeTab === 'patient') {
-        await supabase.from('clinic_patients').insert([{
-          name: formData.name,
-          responsible_name: formData.specialtyOrResponsible,
-          contact: formData.contact,
-          cpf: formData.cpf,
-          birthdate: formData.birthdate,
-          therapies: formData.therapies || [],
-          status: 'active'
-        }]);
+
+      // 2. Salvar no Banco de Dados
+      if (editingId) {
+        // Atualizar
+        if (activeTab === 'patient') {
+          await supabase.from('clinic_patients').update({
+            name: formData.name,
+            responsible_name: formData.specialtyOrResponsible,
+            contact: formData.contact,
+            cpf: formData.cpf,
+            birthdate: formData.birthdate,
+            therapies: formData.therapies,
+            avatar_url: uploadedAvatarUrl
+          }).eq('id', editingId);
+        } else {
+          await supabase.from('clinic_therapists').update({
+            name: formData.name,
+            specialty: formData.specialtyOrResponsible,
+            contact: formData.contact,
+            cpf: formData.cpf,
+            avatar_url: uploadedAvatarUrl
+          }).eq('id', editingId);
+        }
       } else {
-        await supabase.from('clinic_therapists').insert([{
-          name: formData.name,
-          specialty: formData.specialtyOrResponsible,
-          contact: formData.contact,
-          cpf: formData.cpf,
-          status: 'active'
-        }]);
+        // Inserir novo
+        if (activeTab === 'patient') {
+          await supabase.from('clinic_patients').insert([{
+            name: formData.name,
+            responsible_name: formData.specialtyOrResponsible,
+            contact: formData.contact,
+            cpf: formData.cpf,
+            birthdate: formData.birthdate,
+            therapies: formData.therapies || [],
+            status: 'active',
+            avatar_url: uploadedAvatarUrl
+          }]);
+        } else {
+          await supabase.from('clinic_therapists').insert([{
+            name: formData.name,
+            specialty: formData.specialtyOrResponsible,
+            contact: formData.contact,
+            cpf: formData.cpf,
+            status: 'active',
+            avatar_url: uploadedAvatarUrl
+          }]);
+        }
       }
+      
+      setIsModalOpen(false);
+      fetchDbUsers(); // Busca os dados atualizados do Supabase
+    } catch (err) {
+      console.error("Erro ao salvar:", err);
+      alert('Erro ao salvar o cadastro.');
+    } finally {
+      setIsSaving(false);
     }
-    
-    setIsModalOpen(false);
-    fetchDbUsers(); // Busca os dados atualizados do Supabase
   };
 
   const toggleTherapy = (therapy: string) => {
@@ -242,9 +307,13 @@ export default function GestaoCadastros() {
                 <tr key={user.id} className="hover:bg-surface-variant/10 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold">
-                        {user.name.charAt(0)}
-                      </div>
+                      {user.avatar_url ? (
+                        <img src={user.avatar_url} alt={user.name} className="w-10 h-10 rounded-full object-cover shadow-sm border border-surface-variant" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold">
+                          {user.name.charAt(0)}
+                        </div>
+                      )}
                       <div className="flex flex-col">
                         <span className="font-label-md font-bold text-on-surface">{user.name}</span>
                         {user.id.length < 10 && <span className="text-[10px] text-primary/70 font-medium tracking-wide">DADO FICTÍCIO</span>}
@@ -290,13 +359,14 @@ export default function GestaoCadastros() {
         </div>
       </div>
 
-      {/* REGISTRATION MODAL (DRAFT) */}
+      {/* REGISTRATION MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
           <div className="bg-white rounded-3xl p-6 w-full max-w-[600px] shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
             <button 
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full z-10"
+              disabled={isSaving}
             >
               <X size={20} />
             </button>
@@ -306,29 +376,47 @@ export default function GestaoCadastros() {
             </h3>
             
             <form className="space-y-5" onSubmit={handleSave}>
+              
+              {/* ÁREA DE FOTO DE PERFIL */}
+              <div className="flex flex-col items-center justify-center mb-6">
+                <label className="cursor-pointer group relative">
+                  <div className="w-24 h-24 rounded-full bg-slate-100 border-4 border-white shadow-md flex items-center justify-center overflow-hidden transition-all group-hover:shadow-lg group-hover:border-primary/20">
+                    {avatarPreview || formData.avatar_url ? (
+                      <img src={avatarPreview || formData.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
+                    ) : (
+                      <Camera size={32} className="text-slate-300 group-hover:text-primary transition-colors" />
+                    )}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} disabled={isSaving} />
+                </label>
+                <span className="text-xs text-slate-500 mt-2 font-medium">
+                  {avatarPreview ? 'Clique para trocar' : 'Adicionar foto'}
+                </span>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
-                  <input required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: João da Silva" />
+                  <input required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: João da Silva" disabled={isSaving} />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">CPF</label>
-                  <input value={formData.cpf || ''} onChange={e => setFormData({...formData, cpf: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="000.000.000-00" />
+                  <input value={formData.cpf || ''} onChange={e => setFormData({...formData, cpf: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="000.000.000-00" disabled={isSaving} />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Data de Nascimento</label>
-                  <input value={formData.birthdate || ''} onChange={e => setFormData({...formData, birthdate: e.target.value})} type="date" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" />
+                  <input value={formData.birthdate || ''} onChange={e => setFormData({...formData, birthdate: e.target.value})} type="date" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" disabled={isSaving} />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Celular / WhatsApp</label>
-                  <input required value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" />
+                  <input required value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
                 </div>
 
                 {activeTab === 'patient' ? (
                   <>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-slate-700 mb-1">Nome do Responsável (se menor)</label>
-                      <input value={formData.specialtyOrResponsible || ''} onChange={e => setFormData({...formData, specialtyOrResponsible: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Nome da mãe, pai ou tutor" />
+                      <input value={formData.specialtyOrResponsible || ''} onChange={e => setFormData({...formData, specialtyOrResponsible: e.target.value})} type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Nome da mãe, pai ou tutor" disabled={isSaving} />
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-bold text-slate-700 mb-2">Terapias / Especialidades Indicadas</label>
@@ -339,12 +427,13 @@ export default function GestaoCadastros() {
                             <button
                               key={therapy}
                               type="button"
+                              disabled={isSaving}
                               onClick={() => toggleTherapy(therapy)}
                               className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-colors ${
                                 isSelected 
                                   ? 'bg-primary text-white border-primary shadow-sm' 
                                   : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
-                              }`}
+                              } disabled:opacity-50`}
                             >
                               {therapy}
                             </button>
@@ -360,25 +449,32 @@ export default function GestaoCadastros() {
                   <>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1">Especialidade</label>
-                      <select required value={formData.specialtyOrResponsible || ''} onChange={e => setFormData({...formData, specialtyOrResponsible: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600 appearance-none">
+                      <select required value={formData.specialtyOrResponsible || ''} onChange={e => setFormData({...formData, specialtyOrResponsible: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600 appearance-none" disabled={isSaving}>
                         <option value="">Selecione...</option>
                         {therapyOptions.map(t => <option key={t} value={t}>{t}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-1">Registro (CRM/CRP/etc)</label>
-                      <input type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: CRP 00/00000" />
+                      <input type="text" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: CRP 00/00000" disabled={isSaving} />
                     </div>
                   </>
                 )}
               </div>
 
               <div className="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100 mt-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto px-6 py-3 sm:py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto px-6 py-3 sm:py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors" disabled={isSaving}>
                   Cancelar
                 </button>
-                <button type="submit" className="w-full sm:w-auto px-8 py-3 sm:py-2.5 font-bold bg-primary text-white hover:bg-primary/90 rounded-xl shadow-md transition-colors">
-                  {editingId ? 'Atualizar Cadastro' : 'Salvar Cadastro no Banco'}
+                <button type="submit" className="w-full sm:w-auto px-8 py-3 sm:py-2.5 font-bold bg-primary text-white hover:bg-primary/90 rounded-xl shadow-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      Salvando...
+                    </>
+                  ) : (
+                    editingId ? 'Atualizar Cadastro' : 'Salvar no Banco'
+                  )}
                 </button>
               </div>
             </form>
