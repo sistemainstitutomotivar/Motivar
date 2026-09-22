@@ -43,6 +43,10 @@ function App() {
         .eq('id', userId)
         .single();
         
+      if (error) {
+        throw error;
+      }
+        
       if (data && data.role) {
         setUserRole(data.role as UserRole);
       } else {
