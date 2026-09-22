@@ -1,14 +1,17 @@
-import { useState } from 'react';
-import { Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, Clock, MapPin, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Activity } from 'lucide-react';
 
 interface MasterAppointment {
   id: string;
   date: string;
   time: string;
+  durationMinutes?: number;
   patientName: string;
+  patientAvatar?: string;
   therapistName: string;
+  therapistAvatar?: string;
   room: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'in_progress';
   justification?: string;
 }
 
@@ -20,14 +23,57 @@ const yesterday = new Date(today);
 yesterday.setDate(yesterday.getDate() - 1);
 
 const formatYMD = (d: Date) => d.toISOString().split('T')[0];
+const formatTime = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+// Simulando uma sessão "Em andamento" que começou há 25 minutos atrás
+const inProgressDate = new Date();
+inProgressDate.setMinutes(inProgressDate.getMinutes() - 25);
 
 const mockAppointments: MasterAppointment[] = [
-  { id: '1', date: formatYMD(today), time: '08:00', patientName: 'Pedro Henrique', therapistName: 'Dra. Mariana Costa', room: 'Sala 01', status: 'confirmed' },
-  { id: '2', date: formatYMD(today), time: '09:00', patientName: 'Lucas Matheus Silva', therapistName: 'Dr. Roberto Alves', room: 'Sala 04', status: 'pending' },
-  { id: '3', date: formatYMD(today), time: '10:00', patientName: 'Ana Júlia', therapistName: 'Dra. Mariana Costa', room: 'Sala 01', status: 'cancelled', justification: 'Paciente amanheceu com febre.' },
+  { id: '1', date: formatYMD(today), time: '08:00', patientName: 'Pedro Henrique', patientAvatar: 'https://images.unsplash.com/photo-1601288496920-b6154fe3626a?w=150&h=150&fit=crop&q=80', therapistName: 'Dra. Mariana Costa', therapistAvatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&q=80', room: 'Sala 01', status: 'confirmed' },
+  { id: '2', date: formatYMD(today), time: '09:00', patientName: 'Lucas Matheus Silva', patientAvatar: 'https://images.unsplash.com/photo-1595454223600-91fb4eaebec3?w=150&h=150&fit=crop&q=80', therapistName: 'Dr. Roberto Alves', therapistAvatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&h=150&fit=crop&q=80', room: 'Sala 04', status: 'pending' },
+  { id: '3', date: formatYMD(today), time: '10:00', patientName: 'Ana Júlia', therapistName: 'Dra. Mariana Costa', therapistAvatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&q=80', room: 'Sala 01', status: 'cancelled', justification: 'Paciente amanheceu com febre.' },
+  { id: '6', date: formatYMD(today), time: formatTime(inProgressDate), durationMinutes: 50, patientName: 'Rafael Gomes', patientAvatar: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&h=150&fit=crop&q=80', therapistName: 'Dra. Mariana Costa', therapistAvatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&h=150&fit=crop&q=80', room: 'Sala 02', status: 'in_progress' },
   { id: '4', date: formatYMD(tomorrow), time: '11:00', patientName: 'Marcos Vinícius', therapistName: 'Dra. Mariana Costa', room: 'Sala 02', status: 'confirmed' },
   { id: '5', date: formatYMD(yesterday), time: '14:00', patientName: 'Fernanda Lima', therapistName: 'Dr. Roberto Alves', room: 'Sala 03', status: 'confirmed' },
 ];
+
+function SessionProgressBar({ startTime, durationMinutes = 50 }: { startTime: string, durationMinutes?: number }) {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const calculateProgress = () => {
+      const now = new Date();
+      const [hours, minutes] = startTime.split(':').map(Number);
+      const start = new Date();
+      start.setHours(hours, minutes, 0, 0);
+
+      const elapsedMs = now.getTime() - start.getTime();
+      const elapsedMinutes = Math.max(0, elapsedMs / 60000);
+      const percentage = Math.min(100, (elapsedMinutes / durationMinutes) * 100);
+      setProgress(percentage);
+    };
+
+    calculateProgress();
+    const interval = setInterval(calculateProgress, 10000); // Atualiza a cada 10 segundos
+    return () => clearInterval(interval);
+  }, [startTime, durationMinutes]);
+
+  return (
+    <div className="w-full max-w-[140px] mt-2" title={`${Math.round(progress)}% concluído`}>
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Progresso</span>
+        <span className="text-[10px] font-bold text-primary">{Math.round(progress)}%</span>
+      </div>
+      <div className="w-full bg-surface-variant rounded-full h-1.5 overflow-hidden">
+        <div 
+          className="bg-primary h-full rounded-full transition-all duration-1000 ease-out" 
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function GestaoAgenda() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,6 +109,9 @@ export default function GestaoAgenda() {
     const matchesSearch = apt.patientName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesDate && matchesTherapist && matchesSearch;
   });
+
+  // Sort appointments by time
+  const sortedAppointments = [...filteredAppointments].sort((a, b) => a.time.localeCompare(b.time));
 
   return (
     <div className="w-full flex flex-col gap-6">
@@ -139,23 +188,41 @@ export default function GestaoAgenda() {
 
         {/* Table Body */}
         <div className="divide-y divide-surface-variant flex-1">
-          {filteredAppointments.length > 0 ? (
-            filteredAppointments.map((apt) => (
+          {sortedAppointments.length > 0 ? (
+            sortedAppointments.map((apt) => (
               <div key={apt.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center hover:bg-surface-variant/10 transition-colors">
                 <div className="col-span-1 font-headline-md font-bold text-on-surface flex items-center justify-center bg-surface-variant/30 py-2 rounded-lg">
                   {apt.time}
                 </div>
                 
-                <div className="col-span-3 flex flex-col">
-                  <span className="font-label-md font-bold text-on-surface">{apt.patientName}</span>
-                  <span className="md:hidden font-body-sm text-on-surface-variant">Paciente</span>
+                {/* Paciente Column com Avatar */}
+                <div className="col-span-3 flex items-center gap-3">
+                  {apt.patientAvatar ? (
+                    <img src={apt.patientAvatar} alt={apt.patientName} className="w-10 h-10 rounded-full object-cover border border-surface-variant shadow-sm" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-secondary-container text-secondary flex items-center justify-center font-bold text-sm shadow-sm">
+                      {apt.patientName.charAt(0)}
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="font-label-md font-bold text-on-surface">{apt.patientName}</span>
+                    <span className="md:hidden font-body-sm text-on-surface-variant">Paciente</span>
+                  </div>
                 </div>
                 
-                <div className="col-span-3 flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold text-xs">
-                    {apt.therapistName.charAt(apt.therapistName.indexOf(' ') + 1)}
+                {/* Terapeuta Column com Avatar */}
+                <div className="col-span-3 flex items-center gap-3">
+                  {apt.therapistAvatar ? (
+                    <img src={apt.therapistAvatar} alt={apt.therapistName} className="w-8 h-8 rounded-full object-cover border border-surface-variant shadow-sm" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold text-xs shadow-sm">
+                      {apt.therapistName.charAt(apt.therapistName.indexOf(' ') + 1)}
+                    </div>
+                  )}
+                  <div className="flex flex-col">
+                    <span className="font-body-md text-on-surface-variant">{apt.therapistName}</span>
+                    <span className="md:hidden font-body-sm text-on-surface-variant">Terapeuta</span>
                   </div>
-                  <span className="font-body-md text-on-surface-variant">{apt.therapistName}</span>
                 </div>
                 
                 <div className="col-span-2 font-body-md text-on-surface-variant flex items-center gap-1">
@@ -163,19 +230,28 @@ export default function GestaoAgenda() {
                   {apt.room}
                 </div>
                 
-                <div className="col-span-3 flex flex-col items-start gap-1">
+                <div className="col-span-3 flex flex-col items-start gap-1 w-full">
                   <div className={`px-3 py-1.5 rounded-full font-label-sm flex items-center gap-1.5 w-fit ${
                     apt.status === 'confirmed' ? 'bg-[#dcfce7] text-[#15803d]' : 
                     apt.status === 'cancelled' ? 'bg-error-container text-on-error-container' : 
+                    apt.status === 'in_progress' ? 'bg-primary-container text-on-primary-container ring-1 ring-primary/30' :
                     'bg-secondary-container text-on-secondary-container'
                   }`}>
                     {apt.status === 'confirmed' && <CheckCircle size={14} />}
                     {apt.status === 'pending' && <Clock size={14} />}
                     {apt.status === 'cancelled' && <XCircle size={14} />}
+                    {apt.status === 'in_progress' && <Activity size={14} className="animate-pulse" />}
                     
                     {apt.status === 'confirmed' ? 'Confirmado' : 
-                     apt.status === 'cancelled' ? 'Cancelado' : 'Aguardando'}
+                     apt.status === 'cancelled' ? 'Cancelado' : 
+                     apt.status === 'in_progress' ? 'Em andamento' : 'Aguardando'}
                   </div>
+
+                  {/* Renderiza a barra de progresso se estiver em andamento */}
+                  {apt.status === 'in_progress' && (
+                    <SessionProgressBar startTime={apt.time} durationMinutes={apt.durationMinutes} />
+                  )}
+
                   {apt.status === 'cancelled' && apt.justification && (
                     <span className="text-xs text-error font-medium truncate w-full" title={apt.justification}>
                       Motivo: {apt.justification}
