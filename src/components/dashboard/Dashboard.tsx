@@ -3,6 +3,7 @@ import type { UserRole } from '../../App';
 import PatientAgenda from './PatientAgenda';
 import GestaoCadastros from './GestaoCadastros';
 import TherapistDashboard from './TherapistDashboard';
+import GestaoAgenda from './GestaoAgenda';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -78,6 +79,12 @@ function Dashboard({ onLogout, role }: DashboardProps) {
             {/* Apenas Admins */}
             {activeRole === 'admin' && (
               <>
+                <li>
+                  <button onClick={() => setActiveView('agenda')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'agenda' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
+                    <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'agenda' ? "'FILL' 1" : "'FILL' 0" }}>calendar_month</span>
+                    <span className="font-label-md">Agenda Geral</span>
+                  </button>
+                </li>
                 <li>
                   <button onClick={() => setActiveView('financeiro')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'financeiro' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
                     <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'financeiro' ? "'FILL' 1" : "'FILL' 0" }}>payments</span>
@@ -222,7 +229,11 @@ function Dashboard({ onLogout, role }: DashboardProps) {
         )}
 
         {/* Conditional Content based on activeView & activeRole */}
-        {activeView === 'cadastros' ? (
+        {activeView === 'agenda' && activeRole === 'admin' ? (
+          <div className="mt-8">
+            <GestaoAgenda />
+          </div>
+        ) : activeView === 'cadastros' ? (
           <div className="mt-8">
             <GestaoCadastros />
           </div>
