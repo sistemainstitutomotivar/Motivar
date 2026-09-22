@@ -1,4 +1,23 @@
 import { useState } from 'react';
+import { 
+  Bell, 
+  LayoutDashboard, 
+  UserCircle, 
+  History, 
+  CreditCard, 
+  Users, 
+  Settings, 
+  LogOut, 
+  Search,
+  Wrench,
+  Calendar,
+  Baby,
+  MessageSquare,
+  AlertCircle,
+  CheckCircle,
+  Info,
+  User
+} from 'lucide-react';
 import type { UserRole } from '../../App';
 import PatientAgenda from './PatientAgenda';
 import GestaoCadastros from './GestaoCadastros';
@@ -33,7 +52,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
           />
         </div>
         <button className="w-10 h-10 rounded-full hover:bg-surface-container-high transition-colors flex items-center justify-center text-primary active:scale-95 duration-100">
-          <span className="material-symbols-outlined">notifications</span>
+          <Bell size={24} />
         </button>
       </header>
 
@@ -51,7 +70,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
             {/* Todos veem o Início */}
             <li>
               <button onClick={() => setActiveView('overview')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'overview' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-                <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'overview' ? "'FILL' 1" : "'FILL' 0" }}>dashboard</span>
+                <LayoutDashboard size={20} className={activeView === 'overview' ? 'text-primary' : ''} />
                 <span className="font-label-md">{activeRole === 'patient' ? 'Minha Agenda' : 'Dashboard'}</span>
               </button>
             </li>
@@ -60,7 +79,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
             {(activeRole === 'professional' || activeRole === 'admin') && (
               <li>
                 <button onClick={() => setActiveView('pacientes')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'pacientes' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'pacientes' ? "'FILL' 1" : "'FILL' 0" }}>assignment_ind</span>
+                  <UserCircle size={20} className={activeView === 'pacientes' ? 'text-primary' : ''} />
                   <span className="font-label-md">Meus Pacientes</span>
                 </button>
               </li>
@@ -70,7 +89,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
             {activeRole === 'patient' && (
               <li>
                 <button onClick={() => setActiveView('historico')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'historico' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-                  <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'historico' ? "'FILL' 1" : "'FILL' 0" }}>history</span>
+                  <History size={20} className={activeView === 'historico' ? 'text-primary' : ''} />
                   <span className="font-label-md">Histórico e Evolução</span>
                 </button>
               </li>
@@ -81,25 +100,25 @@ function Dashboard({ onLogout, role }: DashboardProps) {
               <>
                 <li>
                   <button onClick={() => setActiveView('agenda')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'agenda' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-                    <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'agenda' ? "'FILL' 1" : "'FILL' 0" }}>calendar_month</span>
+                    <Calendar size={20} className={activeView === 'agenda' ? 'text-primary' : ''} />
                     <span className="font-label-md">Agenda Geral</span>
                   </button>
                 </li>
                 <li>
                   <button onClick={() => setActiveView('financeiro')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'financeiro' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-                    <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'financeiro' ? "'FILL' 1" : "'FILL' 0" }}>payments</span>
+                    <CreditCard size={20} className={activeView === 'financeiro' ? 'text-primary' : ''} />
                     <span className="font-label-md">Financeiro</span>
                   </button>
                 </li>
                 <li>
                   <button onClick={() => setActiveView('cadastros')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'cadastros' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-                    <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'cadastros' ? "'FILL' 1" : "'FILL' 0" }}>groups</span>
+                    <Users size={20} className={activeView === 'cadastros' ? 'text-primary' : ''} />
                     <span className="font-label-md">Gestão de Cadastros</span>
                   </button>
                 </li>
                 <li>
                   <button onClick={() => setActiveView('configuracoes')} className={`w-full flex items-center gap-md px-md py-sm rounded-full mx-sm transition-colors ${activeView === 'configuracoes' ? 'bg-primary-container text-on-primary-container' : 'text-on-surface-variant hover:bg-surface-variant'}`}>
-                    <span className="material-symbols-outlined" style={{ fontVariationSettings: activeView === 'configuracoes' ? "'FILL' 1" : "'FILL' 0" }}>settings</span>
+                    <Settings size={20} className={activeView === 'configuracoes' ? 'text-primary' : ''} />
                     <span className="font-label-md">Configurações</span>
                   </button>
                 </li>
@@ -109,7 +128,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
         </nav>
         <div className="px-sm mt-auto">
           <button onClick={onLogout} className="flex w-full items-center gap-md px-md py-sm text-error mx-sm hover:bg-error-container rounded-full transition-colors cursor-pointer">
-            <span className="material-symbols-outlined">logout</span>
+            <LogOut size={20} />
             <span className="font-label-md">Sair</span>
           </button>
         </div>
@@ -120,7 +139,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
         {/* DEV MODE: ROLE SWITCHER */}
         <div className="mb-6 p-3 bg-amber-100 border border-amber-300 rounded-xl flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-2 text-amber-800">
-            <span className="material-symbols-outlined text-[20px]">construction</span>
+            <Wrench size={20} />
             <span className="font-label-sm font-bold uppercase tracking-wider">Modo Desenvolvedor: Alternar Visão</span>
           </div>
           <div className="flex bg-white rounded-lg p-1 shadow-sm border border-amber-200">
@@ -154,10 +173,10 @@ function Dashboard({ onLogout, role }: DashboardProps) {
           </div>
           <div className="hidden md:flex gap-sm">
             <button className="w-12 h-12 rounded-full bg-surface-container-highest hover:bg-surface-variant transition-colors flex items-center justify-center text-primary shadow-sm">
-              <span className="material-symbols-outlined">search</span>
+              <Search size={24} />
             </button>
             <button className="w-12 h-12 rounded-full bg-surface-container-highest hover:bg-surface-variant transition-colors flex items-center justify-center text-primary shadow-sm relative">
-              <span className="material-symbols-outlined">notifications</span>
+              <Bell size={24} />
               <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-error rounded-full border-2 border-surface-container-highest"></span>
             </button>
           </div>
@@ -327,7 +346,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
               {/* Action Required */}
               <div className="glass-card bg-error-container/80 rounded-2xl p-md">
                 <div className="flex items-center gap-sm mb-4">
-                  <span className="material-symbols-outlined text-error">error</span>
+                  <AlertCircle size={24} className="text-error" />
                   <h3 className="font-headline-md text-error text-[18px] font-bold">Pendências de Cadastro</h3>
                 </div>
                 <p className="font-body-md text-on-error-container mb-6">2 pacientes agendados para hoje estão com a documentação incompleta.</p>
@@ -342,7 +361,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
                 <div className="space-y-5">
                   <div className="flex items-start gap-4">
                     <div className="bg-surface-container-highest p-2 rounded-xl mt-0.5">
-                      <span className="material-symbols-outlined text-on-surface-variant text-[20px]">check_circle</span>
+                      <CheckCircle size={20} className="text-on-surface-variant" />
                     </div>
                     <div>
                       <p className="font-label-md text-on-surface mb-0.5">Lembretes enviados</p>
@@ -351,7 +370,7 @@ function Dashboard({ onLogout, role }: DashboardProps) {
                   </div>
                   <div className="flex items-start gap-4">
                     <div className="bg-surface-container-highest p-2 rounded-xl mt-0.5">
-                      <span className="material-symbols-outlined text-on-surface-variant text-[20px]">info</span>
+                      <Info size={20} className="text-on-surface-variant" />
                     </div>
                     <div>
                       <p className="font-label-md text-on-surface mb-0.5">Atualização de Software</p>
@@ -372,20 +391,20 @@ function Dashboard({ onLogout, role }: DashboardProps) {
           <span className="font-label-sm mt-0.5">Início</span>
         </a>
         <a className="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 tap-highlight-transparent hover:bg-surface-container-high transition-all active:scale-90" href="#">
-          <span className="material-symbols-outlined">child_care</span>
+          <Baby size={24} />
           <span className="font-label-sm mt-0.5">Pacientes</span>
         </a>
         <a className="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 tap-highlight-transparent hover:bg-surface-container-high transition-all active:scale-90" href="#">
-          <span className="material-symbols-outlined">calendar_month</span>
+          <Calendar size={24} />
           <span className="font-label-sm mt-0.5">Agenda</span>
         </a>
         <a className="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 tap-highlight-transparent hover:bg-surface-container-high transition-all active:scale-90 relative" href="#">
-          <span className="material-symbols-outlined">chat</span>
+          <MessageSquare size={24} />
           <span className="absolute top-1 right-3 w-2 h-2 bg-error rounded-full"></span>
           <span className="font-label-sm mt-0.5">Mensagens</span>
         </a>
         <a className="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1 tap-highlight-transparent hover:bg-surface-container-high transition-all active:scale-90" href="#">
-          <span className="material-symbols-outlined">person</span>
+          <User size={24} />
           <span className="font-label-sm mt-0.5">Perfil</span>
         </a>
       </nav>

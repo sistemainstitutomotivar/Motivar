@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { X, Calendar, Clock, MapPin, Info, CheckCircle, XCircle } from 'lucide-react';
 
 interface Session {
   id: string;
@@ -131,7 +132,7 @@ export default function PatientAgenda() {
                       onClick={(e) => { e.stopPropagation(); setExpandedId(null); setJustifyingId(null); }}
                       className="absolute top-6 right-6 w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error/10 hover:text-error transition-colors z-20"
                     >
-                      <span className="material-symbols-outlined text-[18px]">close</span>
+                      <X size={18} />
                     </button>
                   )}
                 </div>
@@ -139,11 +140,11 @@ export default function PatientAgenda() {
                 {/* HORÁRIO E DATA (Sempre visível) */}
                 <div className={`flex items-center gap-4 mt-2 ${isExpanded ? 'justify-center bg-surface-variant/30 p-3 rounded-xl' : ''}`}>
                   <div className="flex items-center gap-1.5 text-on-surface">
-                    <span className="material-symbols-outlined text-primary text-[20px]">calendar_today</span>
+                    <Calendar size={20} className="text-primary" />
                     <span className="font-label-md font-bold">{session.date}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-on-surface">
-                    <span className="material-symbols-outlined text-primary text-[20px]">schedule</span>
+                    <Clock size={20} className="text-primary" />
                     <span className="font-label-md">{session.time}</span>
                   </div>
                 </div>
@@ -154,7 +155,7 @@ export default function PatientAgenda() {
                 <div className="p-5 border-t border-surface-variant space-y-4">
                   
                   <div className="flex items-start gap-2">
-                    <span className="material-symbols-outlined text-on-surface-variant text-[20px]">location_on</span>
+                    <MapPin size={20} className="text-on-surface-variant" />
                     <div>
                       <p className="font-label-sm text-on-surface-variant">Local do Atendimento</p>
                       <p className="font-body-md text-on-surface font-medium">{session.location}</p>
@@ -162,7 +163,7 @@ export default function PatientAgenda() {
                   </div>
 
                   <div className="flex items-start gap-2">
-                    <span className="material-symbols-outlined text-on-surface-variant text-[20px]">info</span>
+                    <Info size={20} className="text-on-surface-variant" />
                     <div>
                       <p className="font-label-sm text-on-surface-variant">Status da Sessão</p>
                       <p className={`font-body-md font-bold ${
@@ -183,14 +184,14 @@ export default function PatientAgenda() {
                         onClick={(e) => { e.stopPropagation(); handleConfirm(session.id); }}
                         className="flex-1 py-2.5 bg-primary text-on-primary rounded-xl font-label-md font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
                       >
-                        <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                        <CheckCircle size={20} />
                         Confirmar
                       </button>
                       <button 
                         onClick={(e) => { e.stopPropagation(); setJustifyingId(session.id); }}
                         className="flex-1 py-2.5 bg-error-container text-on-error-container rounded-xl font-label-md font-bold hover:bg-error hover:text-on-error transition-colors flex items-center justify-center gap-2"
                       >
-                        <span className="material-symbols-outlined text-[20px]">cancel</span>
+                        <XCircle size={20} />
                         Cancelar
                       </button>
                     </div>

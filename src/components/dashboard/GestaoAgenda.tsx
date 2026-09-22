@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, Clock, MapPin, ChevronLeft, ChevronRight, X } from 'lucide-react';
 
 interface MasterAppointment {
   id: string;
@@ -88,14 +88,14 @@ export default function GestaoAgenda() {
         {/* Date Selector */}
         <div className="flex items-center justify-between w-full xl:w-auto gap-4 bg-surface-container-lowest border border-surface-variant rounded-xl p-1">
           <button onClick={handlePrevDay} className="p-2 hover:bg-surface-variant rounded-lg text-on-surface-variant transition-colors">
-            <span className="material-symbols-outlined">chevron_left</span>
+            <ChevronLeft size={20} />
           </button>
           <div className="flex items-center gap-2 text-primary font-bold px-4">
             <CalendarIcon size={20} />
             <span className="whitespace-nowrap min-w-[160px] text-center">{formatDateDisplay(selectedDate)}</span>
           </div>
           <button onClick={handleNextDay} className="p-2 hover:bg-surface-variant rounded-lg text-on-surface-variant transition-colors">
-            <span className="material-symbols-outlined">chevron_right</span>
+            <ChevronRight size={20} />
           </button>
         </div>
 
@@ -159,7 +159,7 @@ export default function GestaoAgenda() {
                 </div>
                 
                 <div className="col-span-2 font-body-md text-on-surface-variant flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[16px]">room</span>
+                  <MapPin size={16} />
                   {apt.room}
                 </div>
                 
@@ -204,7 +204,7 @@ export default function GestaoAgenda() {
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full z-10"
             >
-              <span className="material-symbols-outlined text-[20px]">close</span>
+              <X size={20} />
             </button>
             
             <h3 className="font-display-sm text-xl sm:text-2xl font-bold text-slate-800 mb-6 pr-8">Novo Agendamento</h3>
