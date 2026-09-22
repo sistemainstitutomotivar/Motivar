@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UserPlus, Search, Edit, Trash2, X } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface MockUser {
   id: string;
@@ -13,6 +14,7 @@ interface MockUser {
   therapies?: string[]; // Para pacientes
 }
 
+// Dados Fictícios Fixos (Mantidos conforme solicitado)
 const initialUsers: MockUser[] = [
   { id: '1', name: 'Lucas Matheus Silva', role: 'patient', specialtyOrResponsible: 'Maria Silva (Mãe)', contact: '(11) 98888-7777', status: 'active', therapies: ['Psicologia', 'Fonoaudiologia'] },
   { id: '2', name: 'Pedro Henrique', role: 'patient', specialtyOrResponsible: 'João Henrique (Pai)', contact: '(11) 97777-6666', status: 'active', therapies: ['Terapia Ocupacional'] },
@@ -25,18 +27,72 @@ export default function GestaoCadastros() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // State for Users
-  const [users, setUsers] = useState<MockUser[]>(initialUsers);
+  // State for Users fetched from Supabase
+  const [dbUsers, setDbUsers] = useState<MockUser[]>([]);
   
   // Form State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<MockUser>>({});
 
-  const filteredUsers = users.filter(u => u.role === activeTab && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  useEffect(() => {
+    fetchDbUsers();
+  }, [activeTab]);
 
-  const handleDelete = (id: string) => {
+  const fetchDbUsers = async () => {
+    if (activeTab === 'patient') {
+      const { data, error } = await supabase.from('clinic_patients').select('*').order('created_at', { ascending: false });
+      if (data && !error) {
+        const formatted = data.map(d => ({
+          id: d.id,
+          name: d.name,
+          role: 'patient',
+          specialtyOrResponsible: d.responsible_name,
+          contact: d.contact,
+          status: d.status,
+          cpf: d.cpf,
+          birthdate: d.birthdate,
+          therapies: d.therapies
+        } as MockUser));
+        setDbUsers(formatted);
+      } else if (error) {
+        console.warn('Tabela clinic_patients pode não existir ainda:', error);
+      }
+    } else {
+      const { data, error } = await supabase.from('clinic_therapists').select('*').order('created_at', { ascending: false });
+      if (data && !error) {
+        const formatted = data.map(d => ({
+          id: d.id,
+          name: d.name,
+          role: 'professional',
+          specialtyOrResponsible: d.specialty,
+          contact: d.contact,
+          status: d.status,
+          cpf: d.cpf,
+        } as MockUser));
+        setDbUsers(formatted);
+      } else if (error) {
+        console.warn('Tabela clinic_therapists pode não existir ainda:', error);
+      }
+    }
+  };
+
+  // Combina os dados fictícios (mantidos) com os dados reais do banco
+  const allUsers = [...initialUsers, ...dbUsers];
+  const filteredUsers = allUsers.filter(u => u.role === activeTab && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja remover este cadastro?')) {
-      setUsers(users.filter(u => u.id !== id));
+      if (id.length < 10) {
+        alert('Os usuários de demonstração (fictícios) não podem ser excluídos. Exclua apenas os que você cadastrou no banco real.');
+        return;
+      }
+      
+      if (activeTab === 'patient') {
+        await supabase.from('clinic_patients').delete().eq('id', id);
+      } else {
+        await supabase.from('clinic_therapists').delete().eq('id', id);
+      }
+      fetchDbUsers(); // Atualiza a lista após excluir
     }
   };
 
@@ -52,23 +108,58 @@ export default function GestaoCadastros() {
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (editingId) {
-      setUsers(users.map(u => u.id === editingId ? { ...u, ...formData } as MockUser : u));
+      if (editingId.length < 10) {
+        alert('Não é possível editar usuários de demonstração. Eles são apenas para visualização.');
+        return;
+      }
+      
+      // Atualizar no banco de dados
+      if (activeTab === 'patient') {
+        await supabase.from('clinic_patients').update({
+          name: formData.name,
+          responsible_name: formData.specialtyOrResponsible,
+          contact: formData.contact,
+          cpf: formData.cpf,
+          birthdate: formData.birthdate,
+          therapies: formData.therapies
+        }).eq('id', editingId);
+      } else {
+        await supabase.from('clinic_therapists').update({
+          name: formData.name,
+          specialty: formData.specialtyOrResponsible,
+          contact: formData.contact,
+          cpf: formData.cpf,
+        }).eq('id', editingId);
+      }
     } else {
-      const newUser: MockUser = {
-        ...formData,
-        id: Math.random().toString(36).substr(2, 9),
-        status: 'active',
-        name: formData.name || 'Novo Usuário',
-        role: activeTab,
-        contact: formData.contact || '',
-        specialtyOrResponsible: formData.specialtyOrResponsible || ''
-      } as MockUser;
-      setUsers([...users, newUser]);
+      // Inserir novo no banco de dados
+      if (activeTab === 'patient') {
+        await supabase.from('clinic_patients').insert([{
+          name: formData.name,
+          responsible_name: formData.specialtyOrResponsible,
+          contact: formData.contact,
+          cpf: formData.cpf,
+          birthdate: formData.birthdate,
+          therapies: formData.therapies || [],
+          status: 'active'
+        }]);
+      } else {
+        await supabase.from('clinic_therapists').insert([{
+          name: formData.name,
+          specialty: formData.specialtyOrResponsible,
+          contact: formData.contact,
+          cpf: formData.cpf,
+          status: 'active'
+        }]);
+      }
     }
+    
     setIsModalOpen(false);
+    fetchDbUsers(); // Busca os dados atualizados do Supabase
   };
 
   const toggleTherapy = (therapy: string) => {
@@ -154,7 +245,10 @@ export default function GestaoCadastros() {
                       <div className="w-10 h-10 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold">
                         {user.name.charAt(0)}
                       </div>
-                      <span className="font-label-md font-bold text-on-surface">{user.name}</span>
+                      <div className="flex flex-col">
+                        <span className="font-label-md font-bold text-on-surface">{user.name}</span>
+                        {user.id.length < 10 && <span className="text-[10px] text-primary/70 font-medium tracking-wide">DADO FICTÍCIO</span>}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 font-body-md text-on-surface-variant">{user.specialtyOrResponsible}</td>
@@ -284,7 +378,7 @@ export default function GestaoCadastros() {
                   Cancelar
                 </button>
                 <button type="submit" className="w-full sm:w-auto px-8 py-3 sm:py-2.5 font-bold bg-primary text-white hover:bg-primary/90 rounded-xl shadow-md transition-colors">
-                  {editingId ? 'Atualizar Cadastro' : 'Salvar Cadastro'}
+                  {editingId ? 'Atualizar Cadastro' : 'Salvar Cadastro no Banco'}
                 </button>
               </div>
             </form>
