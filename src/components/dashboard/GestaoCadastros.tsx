@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UserPlus, Search, MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { UserPlus, Search, Edit, Trash2 } from 'lucide-react';
 
 interface MockUser {
   id: string;
