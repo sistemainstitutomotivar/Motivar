@@ -1,13 +1,9 @@
-import Header from './Header';
-import HeroSection from './HeroSection';
-import SpecialtyRoom from './SpecialtyRoom';
+const fs = require('fs');
+const file = 'src/components/landing/LandingPage.tsx';
+let code = fs.readFileSync(file, 'utf8');
 
-export default function LandingPage() {
-  return (
-    <main className="relative w-full bg-slate-50 min-h-screen">
-      <Header />
-      
-            <HeroSection />
+// Replace everything inside <main> after <HeroSection /> up to <footer>
+const newContent = `      <HeroSection />
 
       {/* 1. SCROLLYTELLING: ADENTRANDO A CLÍNICA */}
       {/* Placeholder para o futuro vídeo de entrada na clínica */}
@@ -62,9 +58,9 @@ export default function LandingPage() {
         />
       </div>
 
-      <footer className="bg-slate-900 text-slate-400 py-12 text-center">
-        <p>© 2026 Instituto Motivar. Todos os direitos reservados.</p>
-      </footer>
-    </main>
-  );
-}
+      <footer`;
+
+// We use regex to replace from <HeroSection /> to <footer
+code = code.replace(/<HeroSection \/>[\s\S]*?<footer/, newContent);
+
+fs.writeFileSync(file, code);
