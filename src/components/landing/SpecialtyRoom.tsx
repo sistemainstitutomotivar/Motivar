@@ -14,10 +14,11 @@ interface SpecialtyRoomProps {
   reverse?: boolean;
   zoomScale?: number;
   zoomOrigin?: string;
-  scrubVideo?: boolean; // Não usaremos mais o reverse neste layout de 3 colunas, mas mantemos para compatibilidade
+  scrubVideo?: boolean;
+  objectPosition?: string;
 }
 
-export default function SpecialtyRoom({ title, professionalName, description, imageUrl, videoUrl, zoomScale, zoomOrigin, scrubVideo }: SpecialtyRoomProps) {
+export default function SpecialtyRoom({ title, professionalName, description, imageUrl, videoUrl, zoomScale, zoomOrigin, scrubVideo, objectPosition }: SpecialtyRoomProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<HTMLImageElement & HTMLVideoElement>(null);
   const leftTextRef = useRef<HTMLDivElement>(null);
@@ -116,6 +117,7 @@ export default function SpecialtyRoom({ title, professionalName, description, im
           loop={!scrubVideo}
           muted
           playsInline
+          style={objectPosition ? { objectPosition } : undefined}
           className="absolute inset-0 w-full h-full object-cover opacity-90"
         />
       ) : (
@@ -123,6 +125,7 @@ export default function SpecialtyRoom({ title, professionalName, description, im
           ref={mediaRef as any}
           src={imageUrl} 
           alt={title} 
+          style={objectPosition ? { objectPosition } : undefined}
           className="absolute inset-0 w-full h-full object-cover opacity-90"
         />
       )}

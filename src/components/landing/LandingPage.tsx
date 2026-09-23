@@ -25,8 +25,9 @@ export default function LandingPage() {
           professionalName="CEO do Instituto"
           description="Bem-vindos ao Instituto Motivar. Veja na prática como o corpo e o movimento em harmonia abrem portas para o desenvolvimento pleno das nossas crianças."
           videoUrl="/videos/psicomotricidade.mp4"
-          zoomScale={1.5}
-          zoomOrigin="50% 50%"
+          zoomScale={1.45}
+          zoomOrigin="50% 0%"
+          objectPosition="center top"
           scrubVideo={true}
         />
 
