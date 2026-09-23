@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Mail, Lock, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react';
 
 interface PatientLoginProps {
   onLoginSuccess: () => void;
