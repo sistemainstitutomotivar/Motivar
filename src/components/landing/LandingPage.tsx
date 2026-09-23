@@ -17,7 +17,7 @@ export default function LandingPage() {
           description="O corpo e o movimento em harmonia. Nossa sala é preparada para estimular a coordenação motora, o equilíbrio e a consciência corporal, essenciais para o desenvolvimento global."
           imageUrl="/images/Psicomoticidade.jpeg"
           zoomScale={2.2}
-          zoomOrigin="50% 10%"
+          zoomOrigin="50% 0%"
         />
 
         <SpecialtyRoom 
