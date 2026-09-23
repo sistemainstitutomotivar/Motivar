@@ -172,7 +172,32 @@ export default function GestaoAgenda() {
         alert('É obrigatório informar o motivo do cancelamento para fins de auditoria.');
         return;
       }
-      justification = reason.trim();
+
+      // Regra de Cancelamento (24 horas)
+      const now = new Date();
+      const [year, month, day] = apt.date.split('-').map(Number);
+      const [hours, minutes] = apt.time.split(':').map(Number);
+      const aptDateTime = new Date(year, month - 1, day, hours, minutes);
+      
+      const diffMs = aptDateTime.getTime() - now.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      let statusNote = "";
+      if (diffHours < 24) {
+        statusNote = "[CANCELAMENTO < 24H: Faturado]";
+        const isPast = diffHours < 0;
+        const confirmCancel = window.confirm(
+          `Atenção: Este cancelamento está sendo feito com menos de 24h de antecedência (${
+            isPast ? 'Sessão já ocorreu ou está no horário' : Math.floor(diffHours) + 'h restantes'
+          }).\n\nSegundo a política da clínica, a sessão será considerada como executada e faturada.\n\nDeseja prosseguir com o cancelamento nestes termos?`
+        );
+        if (!confirmCancel) return;
+      } else {
+        statusNote = "[CANCELAMENTO > 24H: Reagendamento Permitido]";
+        alert(`Cancelamento dentro do prazo (antecedência maior que 24h).\n\nO paciente terá direito a reagendamento sem custo adicional.`);
+      }
+
+      justification = `${statusNote} ${reason.trim()}`;
     }
 
     // Atualiza estado visual
