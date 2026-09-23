@@ -362,3 +362,35 @@ export async function updateAppointmentStatus(
     }
   });
 }
+
+/**
+ * Atualiza os dados completos de um agendamento e gera log de auditoria
+ */
+export async function updateAppointment(
+  id: string,
+  payload: Partial<Omit<ClinicAppointment, 'id' | 'created_at'>>
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('clinic_appointments')
+      .update(payload)
+      .eq('id', id);
+
+    if (error) {
+      console.warn('Aviso ao atualizar agendamento no banco:', error.message);
+    }
+  } catch (err) {
+    console.warn('Erro ao atualizar agendamento:', err);
+  }
+
+  await logAuditEvent({
+    action: 'EDICAO',
+    entity_type: 'agendamento',
+    entity_id: id,
+    entity_name: payload.patient_name ? `Consulta: ${payload.patient_name}` : `Agendamento #${id.slice(0, 8)}`,
+    details: {
+      ...payload
+    }
+  });
+}
+

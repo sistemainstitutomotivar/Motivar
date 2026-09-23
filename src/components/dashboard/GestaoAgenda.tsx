@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, 
   Clock, MapPin, ChevronLeft, ChevronRight, X, Activity, Play,
-  Repeat, CalendarRange, Sparkles, Trash2, Copy
+  Repeat, CalendarRange, Sparkles, Trash2, Copy, Edit2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { 
@@ -10,7 +10,8 @@ import {
   createAppointment, 
   createBatchAppointments, 
   generateOccurrences, 
-  updateAppointmentStatus 
+  updateAppointmentStatus,
+  updateAppointment
 } from '../../lib/appointments';
 import type { ClinicAppointment, RecurringSlot } from '../../lib/appointments';
 
@@ -86,6 +87,7 @@ export default function GestaoAgenda() {
   const [formRoom, setFormRoom] = useState('Sala 01 - Principal');
   const [formPrice, setFormPrice] = useState('180');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingAppointmentId, setEditingAppointmentId] = useState<string | null>(null);
 
   // Recorrência (Plano Semanal Fixo / Quinzenal / Avulsa)
   const [recurrenceType, setRecurrenceType] = useState<'single' | 'weekly' | 'biweekly'>('single');
@@ -180,8 +182,8 @@ export default function GestaoAgenda() {
     await updateAppointmentStatus(apt.id, newStatus, justification, apt.patient_name);
   };
 
-  const handleDuplicateAppointment = (apt: ClinicAppointment) => {
-    // Preenche os dados do modal com os dados da sessão existente
+  const handleEditAppointment = (apt: ClinicAppointment) => {
+    setEditingAppointmentId(apt.id);
     setFormPatient(apt.patient_name);
     setFormTherapist(apt.therapist_name);
     setFormRoom(apt.room);
@@ -189,17 +191,27 @@ export default function GestaoAgenda() {
     setFormDate(apt.date);
     setFormTime(apt.time);
     
-    // Reseta configs de recorrência para gerar algo novo
+    // Forçamos single mode para a edição (edição de ocorrência única)
     setRecurrenceType('single');
-    setAdditionalSlots([]);
-    setPeriodWeeks(12);
-
-    // Abre o modal
     setIsModalOpen(true);
   };
 
-  // Salvar Novo Agendamento (Avulso ou Lote Recorrente)
-  const handleCreateAppointment = async (e: React.FormEvent) => {
+  const handleDuplicateAppointment = (apt: ClinicAppointment) => {
+    setEditingAppointmentId(null);
+    setFormPatient(apt.patient_name);
+    setFormTherapist(apt.therapist_name);
+    setFormRoom(apt.room);
+    setFormPrice(apt.price?.toString() || '180');
+    setFormDate(apt.date);
+    setFormTime(apt.time);
+    setRecurrenceType('single');
+    setAdditionalSlots([]);
+    setPeriodWeeks(12);
+    setIsModalOpen(true);
+  };
+
+  // Salvar Novo Agendamento (Avulso, Lote ou Edição)
+  const handleSaveAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPatient || !formTherapist || !formDate || !formTime) {
       alert('Por favor, preencha todos os campos obrigatórios.');
@@ -222,29 +234,43 @@ export default function GestaoAgenda() {
         therapist_name: formTherapist,
         therapist_avatar: selectedTherapistObj?.avatar_url,
         room: formRoom,
-        status: 'confirmed' as const,
         price: parseFloat(formPrice) || 180,
-        payment_status: 'pending' as const,
       };
 
-      if (recurrenceType === 'single') {
-        const created = await createAppointment({
-          ...baseAppointmentData,
-          recurrence_type: 'single'
-        });
-        setAppointments(prev => [created, ...prev]);
-        alert('Agendamento avulso realizado e registrado na trilha de auditoria com sucesso!');
+      if (editingAppointmentId) {
+        // Modo Edição
+        await updateAppointment(editingAppointmentId, baseAppointmentData);
+        setAppointments(prev => prev.map(a => 
+          a.id === editingAppointmentId ? { ...a, ...baseAppointmentData } : a
+        ));
+        alert('Agendamento atualizado com sucesso!');
       } else {
-        const occurrences = generateOccurrences(
-          baseAppointmentData,
-          recurrenceType,
-          periodWeeks,
-          additionalSlots
-        );
-        const createdBatch = await createBatchAppointments(occurrences);
-        setAppointments(prev => [...createdBatch, ...prev]);
-        const modalityLabel = recurrenceType === 'weekly' ? 'Semanal Fixo' : 'Quinzenal';
-        alert(`Plano ${modalityLabel} criado com sucesso! ${createdBatch.length} sessões agendadas e registradas na auditoria.`);
+        // Modo Criação
+        const createPayload = {
+          ...baseAppointmentData,
+          status: 'confirmed' as const,
+          payment_status: 'pending' as const,
+        };
+
+        if (recurrenceType === 'single') {
+          const created = await createAppointment({
+            ...createPayload,
+            recurrence_type: 'single'
+          });
+          setAppointments(prev => [created, ...prev]);
+          alert('Agendamento avulso realizado e registrado na trilha de auditoria com sucesso!');
+        } else {
+          const occurrences = generateOccurrences(
+            createPayload,
+            recurrenceType,
+            periodWeeks,
+            additionalSlots
+          );
+          const createdBatch = await createBatchAppointments(occurrences);
+          setAppointments(prev => [...createdBatch, ...prev]);
+          const modalityLabel = recurrenceType === 'weekly' ? 'Semanal Fixo' : 'Quinzenal';
+          alert(`Plano ${modalityLabel} criado com sucesso! ${createdBatch.length} sessões agendadas e registradas na auditoria.`);
+        }
       }
 
       setIsModalOpen(false);
@@ -255,6 +281,7 @@ export default function GestaoAgenda() {
       setRecurrenceType('single');
       setAdditionalSlots([]);
       setPeriodWeeks(12);
+      setEditingAppointmentId(null);
     } catch (err) {
       console.error(err);
       alert('Ocorreu um erro ao salvar o agendamento.');
@@ -479,6 +506,14 @@ export default function GestaoAgenda() {
                     <div className="w-px h-4 bg-slate-200 mx-1"></div>
                     
                     <button 
+                      onClick={() => handleEditAppointment(apt)}
+                      title="Editar Agendamento"
+                      className="p-1 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+
+                    <button 
                       onClick={() => handleDuplicateAppointment(apt)}
                       title="Copiar / Duplicar Consulta"
                       className="p-1 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors"
@@ -523,9 +558,11 @@ export default function GestaoAgenda() {
               <X size={20} />
             </button>
             
-            <h3 className="font-display-sm text-xl sm:text-2xl font-bold text-slate-800 mb-6 pr-8">Novo Agendamento</h3>
+            <h3 className="font-display-sm text-xl sm:text-2xl font-bold text-slate-800 mb-6 pr-8">
+              {editingAppointmentId ? 'Editar Agendamento' : 'Novo Agendamento'}
+            </h3>
             
-            <form className="space-y-4" onSubmit={handleCreateAppointment}>
+            <form className="space-y-4" onSubmit={handleSaveAppointment}>
               {/* Paciente do Banco */}
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Paciente *</label>
@@ -562,9 +599,11 @@ export default function GestaoAgenda() {
               </div>
 
               {/* Modalidade / Frequência da Terapia */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Frequência / Tipo de Agenda *</label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {!editingAppointmentId && (
+                <>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Frequência / Tipo de Agenda *</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setRecurrenceType('single')}
@@ -715,6 +754,8 @@ export default function GestaoAgenda() {
                   </div>
                 </div>
               )}
+              </>
+            )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
