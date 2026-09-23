@@ -70,7 +70,7 @@ export default function GestaoAgenda() {
   const [loading, setLoading] = useState(true);
   
   // Listas reais do banco de dados
-  const [patientsList, setPatientsList] = useState<{ id: string; name: string; avatar_url?: string }[]>([]);
+  const [patientsList, setPatientsList] = useState<{ id: string; name: string; avatar_url?: string; therapies?: string[] }[]>([]);
   const [therapistsList, setTherapistsList] = useState<{ id: string; name: string; specialty?: string; avatar_url?: string }[]>([]);
 
   // Estados dos Filtros
@@ -125,12 +125,12 @@ export default function GestaoAgenda() {
       setAppointments(apts);
 
       // 2. Busca Pacientes Reais no Banco
-      const { data: dbPatients } = await supabase.from('clinic_patients').select('id, name, avatar_url').order('name');
+      const { data: dbPatients } = await supabase.from('clinic_patients').select('id, name, avatar_url, therapies').order('name');
       const basePatients = [
-        { id: 'mock-p1', name: 'Lucas Matheus Silva' },
-        { id: 'mock-p2', name: 'Pedro Henrique' },
-        { id: 'mock-p3', name: 'Ana Júlia' },
-        { id: 'mock-p4', name: 'Rafael Gomes' },
+        { id: 'mock-p1', name: 'Lucas Matheus Silva', therapies: ['Psicologia', 'Fonoaudiologia'] },
+        { id: 'mock-p2', name: 'Pedro Henrique', therapies: ['Terapia Ocupacional'] },
+        { id: 'mock-p3', name: 'Ana Júlia', therapies: [] },
+        { id: 'mock-p4', name: 'Rafael Gomes', therapies: [] },
       ];
       if (dbPatients && dbPatients.length > 0) {
         // Junta pacientes reais com base
@@ -668,7 +668,17 @@ export default function GestaoAgenda() {
                   className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
                 >
                   <option value="">Selecione o(a) terapeuta...</option>
-                  {therapistsList.map(t => (
+                  {therapistsList
+                    .filter(t => {
+                      if (!formPatient) return true; // Se nenhum paciente selecionado, mostra todos
+                      const patient = patientsList.find(p => p.name === formPatient);
+                      // Se o paciente tiver terapias cadastradas, filtra
+                      if (patient && patient.therapies && patient.therapies.length > 0) {
+                        return t.specialty && patient.therapies.includes(t.specialty);
+                      }
+                      return true; // Se não houver terapias cadastradas, mostra todos
+                    })
+                    .map(t => (
                     <option key={t.id} value={t.name}>
                       {t.name} {t.specialty ? `(${t.specialty})` : ''}
                     </option>
