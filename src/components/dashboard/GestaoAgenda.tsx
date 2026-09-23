@@ -166,6 +166,12 @@ export default function GestaoAgenda() {
     let justification: string | undefined = undefined;
 
     if (newStatus === 'cancelled') {
+      const requestedBy = window.prompt("Quem está solicitando este cancelamento?\n\nDigite 1 para PACIENTE\nDigite 2 para CLÍNICA (Terapeuta/Recepção)");
+      if (requestedBy !== '1' && requestedBy !== '2') {
+        alert("Operação cancelada. É necessário informar quem solicitou o cancelamento.");
+        return;
+      }
+
       const reason = window.prompt('Informe o motivo do cancelamento da sessão:');
       if (reason === null) return; // Usuário cancelou o prompt
       if (!reason.trim()) {
@@ -173,28 +179,35 @@ export default function GestaoAgenda() {
         return;
       }
 
-      // Regra de Cancelamento (24 horas)
-      const now = new Date();
-      const [year, month, day] = apt.date.split('-').map(Number);
-      const [hours, minutes] = apt.time.split(':').map(Number);
-      const aptDateTime = new Date(year, month - 1, day, hours, minutes);
-      
-      const diffMs = aptDateTime.getTime() - now.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
-
       let statusNote = "";
-      if (diffHours < 24) {
-        statusNote = "[CANCELAMENTO < 24H: Faturado]";
-        const isPast = diffHours < 0;
-        const confirmCancel = window.confirm(
-          `Atenção: Este cancelamento está sendo feito com menos de 24h de antecedência (${
-            isPast ? 'Sessão já ocorreu ou está no horário' : Math.floor(diffHours) + 'h restantes'
-          }).\n\nSegundo a política da clínica, a sessão será considerada como executada e faturada.\n\nDeseja prosseguir com o cancelamento nestes termos?`
-        );
-        if (!confirmCancel) return;
+
+      if (requestedBy === '1') {
+        // Cancelado pelo PACIENTE (Aplica regra de 24h)
+        const now = new Date();
+        const [year, month, day] = apt.date.split('-').map(Number);
+        const [hours, minutes] = apt.time.split(':').map(Number);
+        const aptDateTime = new Date(year, month - 1, day, hours, minutes);
+        
+        const diffMs = aptDateTime.getTime() - now.getTime();
+        const diffHours = diffMs / (1000 * 60 * 60);
+
+        if (diffHours < 24) {
+          statusNote = "[CANCELADO PELO PACIENTE < 24H: Faturado]";
+          const isPast = diffHours < 0;
+          const confirmCancel = window.confirm(
+            `Atenção: Este cancelamento solicitado pelo PACIENTE está sendo feito com menos de 24h de antecedência (${
+              isPast ? 'Sessão já ocorreu ou está no horário' : Math.floor(diffHours) + 'h restantes'
+            }).\n\nSegundo a política da clínica, a sessão será faturada normalmente.\n\nDeseja prosseguir?`
+          );
+          if (!confirmCancel) return;
+        } else {
+          statusNote = "[CANCELADO PELO PACIENTE > 24H: Reagendamento Permitido]";
+          alert(`O paciente cancelou dentro do prazo (mais de 24h).\n\nA sessão não será cobrada e está liberada para reagendamento.`);
+        }
       } else {
-        statusNote = "[CANCELAMENTO > 24H: Reagendamento Permitido]";
-        alert(`Cancelamento dentro do prazo (antecedência maior que 24h).\n\nO paciente terá direito a reagendamento sem custo adicional.`);
+        // Cancelado pela CLÍNICA (Sempre reagenda, sem faturar contra o paciente)
+        statusNote = "[CANCELADO PELA CLÍNICA: Reagendamento Permitido]";
+        alert(`Cancelamento por parte da CLÍNICA registrado.\n\nComo a indisponibilidade foi da clínica/terapeuta, o paciente tem direito ao reagendamento da sessão.`);
       }
 
       justification = `${statusNote} ${reason.trim()}`;
