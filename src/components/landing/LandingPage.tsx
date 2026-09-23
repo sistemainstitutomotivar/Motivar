@@ -25,8 +25,9 @@ export default function LandingPage() {
           professionalName="Especialista em Ação"
           description="Veja na prática como o corpo e o movimento em harmonia ajudam no desenvolvimento. Nossa sala é preparada para estimular a coordenação motora de forma lúdica."
           videoUrl="/videos/psicomotricidade.mp4"
-          zoomScale={1.5}
-          zoomOrigin="50% 50%"
+          zoomScale={1.8}
+          zoomOrigin="50% 10%"
+          scrubVideo={true}
         />
 
 

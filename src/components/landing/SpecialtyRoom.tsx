@@ -13,10 +13,11 @@ interface SpecialtyRoomProps {
   videoUrl?: string;
   reverse?: boolean;
   zoomScale?: number;
-  zoomOrigin?: string; // Não usaremos mais o reverse neste layout de 3 colunas, mas mantemos para compatibilidade
+  zoomOrigin?: string;
+  scrubVideo?: boolean; // Não usaremos mais o reverse neste layout de 3 colunas, mas mantemos para compatibilidade
 }
 
-export default function SpecialtyRoom({ title, professionalName, description, imageUrl, videoUrl, zoomScale, zoomOrigin }: SpecialtyRoomProps) {
+export default function SpecialtyRoom({ title, professionalName, description, imageUrl, videoUrl, zoomScale, zoomOrigin, scrubVideo }: SpecialtyRoomProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<HTMLImageElement & HTMLVideoElement>(null);
   const leftTextRef = useRef<HTMLDivElement>(null);
@@ -37,7 +38,28 @@ export default function SpecialtyRoom({ title, professionalName, description, im
       }
     });
 
-    // Zoom no rosto/busto do profissional (centro superior da imagem)
+    
+    // Scrub video se ativado
+    if (scrubVideo && videoUrl) {
+      const progressObj = { value: 0 };
+      tl.to(progressObj, {
+        value: 1,
+        ease: "none",
+        onUpdate: () => {
+          if (mediaRef.current) {
+            const vid = mediaRef.current as HTMLVideoElement;
+            if (vid.duration) {
+              // Pause is enforced by removing autoPlay, but just to be safe:
+              if (!vid.paused) vid.pause();
+              vid.currentTime = vid.duration * progressObj.value;
+            }
+          }
+        }
+      }, 0);
+    }
+
+    // Zoom no rosto/busto
+
     tl.to(mediaRef.current, {
       scale: zoomScale || 1.8,
       transformOrigin: zoomOrigin || "50% 25%", 
@@ -74,8 +96,8 @@ export default function SpecialtyRoom({ title, professionalName, description, im
         <video 
           ref={mediaRef as any}
           src={videoUrl}
-          autoPlay
-          loop
+          autoPlay={!scrubVideo}
+          loop={!scrubVideo}
           muted
           playsInline
           className="absolute inset-0 w-full h-full object-cover opacity-90"
