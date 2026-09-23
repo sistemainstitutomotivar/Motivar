@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Search, Edit, Trash2, X, Camera } from 'lucide-react';
+import { UserPlus, Search, Edit, Trash2, X, Camera, ShieldCheck, UserCheck, Briefcase } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { logAuditEvent } from '../../lib/audit';
 import imageCompression from 'browser-image-compression';
 
 interface MockUser {
   id: string;
   name: string;
-  role: 'patient' | 'professional';
-  specialty?: string;
+  role: 'patient' | 'professional' | 'collaborator';
+  specialty?: string; // Para terapeutas
+  position?: string; // Para colaboradores (Secretária, Recepção, etc.)
+  email?: string;
   mother_name?: string;
   mother_contact?: string;
   father_name?: string;
   father_contact?: string;
-  contact: string; // Contato principal ou do terapeuta
+  contact: string; // Contato principal
   status: 'active' | 'inactive';
   cpf?: string;
   birthdate?: string;
@@ -20,16 +23,17 @@ interface MockUser {
   avatar_url?: string;
 }
 
-// Dados Fictícios Fixos
+// Dados Fictícios Iniciais
 const initialUsers: MockUser[] = [
   { id: '1', name: 'Lucas Matheus Silva', role: 'patient', mother_name: 'Maria Silva (Mãe)', contact: '(11) 98888-7777', status: 'active', therapies: ['Psicologia', 'Fonoaudiologia'] },
   { id: '2', name: 'Pedro Henrique', role: 'patient', father_name: 'João Henrique (Pai)', contact: '(11) 97777-6666', status: 'active', therapies: ['Terapia Ocupacional'] },
   { id: '3', name: 'Dra. Mariana Costa', role: 'professional', specialty: 'Psicologia', contact: '(11) 96666-5555', status: 'active' },
   { id: '4', name: 'Dr. Roberto Alves', role: 'professional', specialty: 'Fonoaudiologia', contact: '(11) 95555-4444', status: 'active' },
+  { id: 'staff-1', name: 'Camila Albuquerque', role: 'collaborator', position: 'Secretária Geral & Recepção', email: 'secretaria@institutomotivar.com.br', contact: '(11) 94444-2222', status: 'active' },
 ];
 
 export default function GestaoCadastros() {
-  const [activeTab, setActiveTab] = useState<'patient' | 'professional'>('patient');
+  const [activeTab, setActiveTab] = useState<'patient' | 'professional' | 'collaborator'>('patient');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -70,7 +74,7 @@ export default function GestaoCadastros() {
       } else if (error) {
         console.warn('Tabela clinic_patients pode não existir ainda:', error);
       }
-    } else {
+    } else if (activeTab === 'professional') {
       const { data, error } = await supabase.from('clinic_therapists').select('*').order('created_at', { ascending: false });
       if (data && !error) {
         const formatted = data.map(d => ({
@@ -87,6 +91,25 @@ export default function GestaoCadastros() {
       } else if (error) {
         console.warn('Tabela clinic_therapists pode não existir ainda:', error);
       }
+    } else {
+      // Colaboradores / Secretária
+      const { data, error } = await supabase.from('clinic_staff').select('*').order('created_at', { ascending: false });
+      if (data && !error) {
+        const formatted = data.map(d => ({
+          id: d.id,
+          name: d.name,
+          role: 'collaborator',
+          position: d.position,
+          email: d.email,
+          contact: d.contact,
+          status: d.status,
+          cpf: d.cpf,
+          avatar_url: d.avatar_url
+        } as MockUser));
+        setDbUsers(formatted);
+      } else if (error) {
+        console.warn('Tabela clinic_staff pode não existir ainda:', error);
+      }
     }
   };
 
@@ -94,18 +117,43 @@ export default function GestaoCadastros() {
   const filteredUsers = allUsers.filter(u => u.role === activeTab && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja remover este cadastro?')) {
-      if (id.length < 10) {
-        alert('Os usuários de demonstração (fictícios) não podem ser excluídos. Exclua apenas os que você cadastrou no banco real.');
-        return;
-      }
-      
+    const userToDelete = allUsers.find(u => u.id === id);
+    if (!window.confirm(`Tem certeza que deseja remover o cadastro de "${userToDelete?.name || 'este registro'}"?`)) {
+      return;
+    }
+
+    if (id.length < 10) {
+      alert('Os usuários de demonstração (fictícios) não podem ser excluídos. Exclua apenas os que você cadastrou no banco real.');
+      return;
+    }
+    
+    try {
       if (activeTab === 'patient') {
         await supabase.from('clinic_patients').delete().eq('id', id);
-      } else {
+      } else if (activeTab === 'professional') {
         await supabase.from('clinic_therapists').delete().eq('id', id);
+      } else {
+        await supabase.from('clinic_staff').delete().eq('id', id);
       }
+
+      // Registra Auditoria de Exclusão
+      await logAuditEvent({
+        action: 'EXCLUSAO',
+        entity_type: activeTab === 'patient' ? 'paciente' : activeTab === 'professional' ? 'terapeuta' : 'colaborador',
+        entity_id: id,
+        entity_name: userToDelete?.name || 'Registro removido',
+        details: {
+          id,
+          tipo: activeTab,
+          dados_anteriores: userToDelete
+        }
+      });
+
+      alert('Cadastro removido com sucesso e registrado na trilha de auditoria.');
       fetchDbUsers();
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao excluir o cadastro.');
     }
   };
 
@@ -118,7 +166,12 @@ export default function GestaoCadastros() {
   };
 
   const handleOpenNew = () => {
-    setFormData({ role: activeTab, therapies: [] });
+    setFormData({ 
+      role: activeTab, 
+      therapies: [],
+      status: 'active',
+      position: activeTab === 'collaborator' ? 'Secretária' : undefined 
+    });
     setEditingId(null);
     setAvatarFile(null);
     setAvatarPreview(null);
@@ -171,11 +224,12 @@ export default function GestaoCadastros() {
           uploadedAvatarUrl = publicUrlData.publicUrl;
         } catch (imgError) {
           console.error("Erro ao comprimir/subir imagem:", imgError);
-          alert('Houve um erro ao enviar a imagem (verifique se o bucket "avatars" foi criado e está público no Supabase). O cadastro será salvo sem foto.');
+          alert('Houve um erro ao enviar a imagem (verifique se o bucket "avatars" está público no Supabase). O cadastro será salvo sem foto.');
         }
       }
 
       if (editingId) {
+        // EDIÇÃO
         if (activeTab === 'patient') {
           const { error: err1 } = await supabase.from('clinic_patients').update({
             name: formData.name,
@@ -188,19 +242,44 @@ export default function GestaoCadastros() {
             birthdate: formData.birthdate,
             therapies: formData.therapies,
             avatar_url: uploadedAvatarUrl
-          }).eq('id', editingId); if (err1) throw err1;
-        } else {
+          }).eq('id', editingId); 
+          if (err1) throw err1;
+        } else if (activeTab === 'professional') {
           const { error: err2 } = await supabase.from('clinic_therapists').update({
             name: formData.name,
             specialty: formData.specialty,
             contact: formData.contact,
             cpf: formData.cpf,
             avatar_url: uploadedAvatarUrl
-          }).eq('id', editingId); if (err2) throw err2;
+          }).eq('id', editingId); 
+          if (err2) throw err2;
+        } else {
+          const { error: errStaff } = await supabase.from('clinic_staff').update({
+            name: formData.name,
+            position: formData.position || 'Secretária',
+            email: formData.email,
+            contact: formData.contact,
+            cpf: formData.cpf,
+            avatar_url: uploadedAvatarUrl
+          }).eq('id', editingId);
+          if (errStaff) throw errStaff;
         }
+
+        // Log de Auditoria: EDICAO
+        await logAuditEvent({
+          action: 'EDICAO',
+          entity_type: activeTab === 'patient' ? 'paciente' : activeTab === 'professional' ? 'terapeuta' : 'colaborador',
+          entity_id: editingId,
+          entity_name: formData.name || 'Registro',
+          details: { ...formData, avatar_url: uploadedAvatarUrl }
+        });
+
       } else {
+        // CRIAÇÃO
+        let newRecordId: string | undefined = undefined;
+
         if (activeTab === 'patient') {
-          const { error: err3 } = await supabase.from('clinic_patients').insert([{
+          const { data, error: err3 } = await supabase.from('clinic_patients').insert([{
             name: formData.name,
             mother_name: formData.mother_name,
             mother_contact: formData.mother_contact,
@@ -212,25 +291,51 @@ export default function GestaoCadastros() {
             therapies: formData.therapies || [],
             status: 'active',
             avatar_url: uploadedAvatarUrl
-          }]); if (err3) throw err3;
-        } else {
-          const { error: err4 } = await supabase.from('clinic_therapists').insert([{
+          }]).select(); 
+          if (err3) throw err3;
+          newRecordId = data?.[0]?.id;
+        } else if (activeTab === 'professional') {
+          const { data, error: err4 } = await supabase.from('clinic_therapists').insert([{
             name: formData.name,
             specialty: formData.specialty,
             contact: formData.contact,
             cpf: formData.cpf,
             status: 'active',
             avatar_url: uploadedAvatarUrl
-          }]); if (err4) throw err4;
+          }]).select(); 
+          if (err4) throw err4;
+          newRecordId = data?.[0]?.id;
+        } else {
+          const { data, error: errStaffInsert } = await supabase.from('clinic_staff').insert([{
+            name: formData.name,
+            position: formData.position || 'Secretária',
+            email: formData.email,
+            contact: formData.contact,
+            cpf: formData.cpf,
+            status: 'active',
+            avatar_url: uploadedAvatarUrl
+          }]).select();
+          if (errStaffInsert) throw errStaffInsert;
+          newRecordId = data?.[0]?.id;
         }
+
+        // Log de Auditoria: CRIACAO
+        await logAuditEvent({
+          action: 'CRIACAO',
+          entity_type: activeTab === 'patient' ? 'paciente' : activeTab === 'professional' ? 'terapeuta' : 'colaborador',
+          entity_id: newRecordId,
+          entity_name: formData.name || 'Novo Registro',
+          details: { ...formData, avatar_url: uploadedAvatarUrl }
+        });
       }
       
       setIsModalOpen(false);
       fetchDbUsers();
+      alert('Cadastro salvo e registrado na auditoria com sucesso!');
     } catch (err) {
       console.error("Erro ao salvar:", err);
       const errorMsg = err instanceof Error ? err.message : (err as any)?.message || JSON.stringify(err);
-      alert('ERRO DO SUPABASE:\n\n' + errorMsg + '\n\n(Tire um print deste erro e mande para o chat)');
+      alert('ERRO DO SUPABASE:\n\n' + errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -245,7 +350,7 @@ export default function GestaoCadastros() {
     }
   };
 
-  const therapyOptions = ['Psicologia', 'Fonoaudiologia', 'Terapia Ocupacional', 'Psicopedagogia', 'Musicoterapia'];
+  const therapyOptions = ['Psicologia', 'Fonoaudiologia', 'Terapia Ocupacional', 'Psicopedagogia', 'Musicoterapia', 'Psicomotricidade'];
 
   return (
     <div className="w-full flex flex-col gap-6">
@@ -253,262 +358,369 @@ export default function GestaoCadastros() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-surface-variant shadow-sm">
         <div>
           <h2 className="font-display-sm text-3xl font-bold text-on-surface">Gestão de Cadastros</h2>
-          <p className="font-body-md text-on-surface-variant mt-1">Gerencie pacientes e terapeutas da clínica.</p>
+          <p className="font-body-md text-on-surface-variant mt-1">
+            Gerencie pacientes, terapeutas e a equipe de secretárias/colaboradores da clínica com trilha de auditoria ativa.
+          </p>
         </div>
         <button 
           onClick={handleOpenNew}
           className="bg-primary text-on-primary px-6 py-3 rounded-xl font-label-md font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors shadow-md"
         >
           <UserPlus size={20} />
-          {activeTab === 'patient' ? 'Novo Paciente' : 'Novo Terapeuta'}
+          {activeTab === 'patient' ? 'Novo Paciente' : activeTab === 'professional' ? 'Novo Terapeuta' : 'Nova Secretária/Colaborador'}
         </button>
       </div>
 
-      {/* CONTROLS (TABS & SEARCH) */}
-      <div className="flex flex-col md:flex-row justify-between gap-4 items-center">
-        <div className="flex bg-surface-variant/30 p-1 rounded-xl w-full md:w-auto">
-          <button 
-            onClick={() => setActiveTab('patient')}
-            className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg font-label-md transition-all ${activeTab === 'patient' ? 'bg-white text-primary shadow-sm font-bold' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            Pacientes
-          </button>
-          <button 
-            onClick={() => setActiveTab('professional')}
-            className={`flex-1 md:flex-none px-6 py-2.5 rounded-lg font-label-md transition-all ${activeTab === 'professional' ? 'bg-white text-primary shadow-sm font-bold' : 'text-on-surface-variant hover:text-on-surface'}`}
-          >
-            Terapeutas
-          </button>
-        </div>
-
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" size={18} />
-          <input 
-            type="text" 
-            placeholder="Buscar por nome..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-surface-variant rounded-xl focus:ring-2 focus:ring-primary outline-none font-body-sm"
-          />
-        </div>
+      {/* TABS DE SELEÇÃO */}
+      <div className="flex bg-surface-variant/30 p-1.5 rounded-2xl w-full md:w-fit gap-1">
+        <button
+          onClick={() => setActiveTab('patient')}
+          className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-label-md font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'patient' 
+              ? 'bg-white text-primary shadow-sm' 
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <UserCheck size={18} />
+          Pacientes ({allUsers.filter(u => u.role === 'patient').length})
+        </button>
+        <button
+          onClick={() => setActiveTab('professional')}
+          className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-label-md font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'professional' 
+              ? 'bg-white text-primary shadow-sm' 
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <ShieldCheck size={18} />
+          Terapeutas ({allUsers.filter(u => u.role === 'professional').length})
+        </button>
+        <button
+          onClick={() => setActiveTab('collaborator')}
+          className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-label-md font-bold transition-all flex items-center gap-2 ${
+            activeTab === 'collaborator' 
+              ? 'bg-white text-primary shadow-sm' 
+              : 'text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          <Briefcase size={18} />
+          Secretárias & Recepção ({allUsers.filter(u => u.role === 'collaborator').length})
+        </button>
       </div>
 
-      {/* DATA TABLE */}
+      {/* BARRA DE PESQUISA */}
+      <div className="relative w-full md:w-96">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant" size={20} />
+        <input 
+          type="text" 
+          placeholder={`Buscar ${activeTab === 'patient' ? 'paciente' : activeTab === 'professional' ? 'terapeuta' : 'secretária'} por nome...`}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-12 pr-4 py-3 bg-white border border-surface-variant rounded-2xl focus:ring-2 focus:ring-primary outline-none font-body-sm shadow-sm"
+        />
+      </div>
+
+      {/* LISTAGEM */}
       <div className="bg-white rounded-3xl border border-surface-variant shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-surface-container-lowest border-b border-surface-variant">
-                <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider">Nome</th>
-                <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider">
-                  {activeTab === 'patient' ? 'Responsável' : 'Especialidade'}
-                </th>
-                {activeTab === 'patient' && (
-                  <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider">Terapias</th>
-                )}
-                <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider">Contato</th>
-                <th className="font-label-sm font-bold text-on-surface-variant px-6 py-4 uppercase tracking-wider text-right">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-variant">
-              {filteredUsers.length > 0 ? filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-surface-variant/10 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {user.avatar_url ? (
-                        <img src={user.avatar_url} alt={user.name} className="w-10 h-10 rounded-full object-cover shadow-sm border border-surface-variant" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold">
-                          {user.name.charAt(0)}
-                        </div>
-                      )}
-                      <div className="flex flex-col">
-                        <span className="font-label-md font-bold text-on-surface">{user.name}</span>
-                        {user.id.length < 10 && <span className="text-[10px] text-primary/70 font-medium tracking-wide">DADO FICTÍCIO</span>}
-                      </div>
+        <div className="divide-y divide-surface-variant">
+          {filteredUsers.length > 0 ? (
+            filteredUsers.map((user) => (
+              <div key={user.id} className="p-4 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-surface-variant/10 transition-colors">
+                <div className="flex items-center gap-4">
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.name} className="w-14 h-14 rounded-full object-cover border-2 border-surface-variant shadow-sm" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold text-xl shadow-sm">
+                      {user.name.charAt(0)}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 font-body-md text-on-surface-variant">
-                    {user.role === 'patient' ? (user.mother_name || user.father_name || 'Não informado') : user.specialty}
-                  </td>
-                  {activeTab === 'patient' && (
-                    <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {user.therapies?.map((t, i) => (
-                          <span key={i} className="text-[10px] font-bold px-2 py-0.5 bg-surface-variant text-on-surface-variant rounded-full">
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
                   )}
-                  <td className="px-6 py-4 font-body-md text-on-surface-variant">{user.contact}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleEdit(user)} className="p-2 text-on-surface-variant hover:text-primary transition-colors rounded-full hover:bg-surface-variant/50">
-                      <Edit size={18} />
-                    </button>
-                    <button onClick={() => handleDelete(user.id)} className="p-2 text-on-surface-variant hover:text-error transition-colors rounded-full hover:bg-error-container/50 ml-1">
-                      <Trash2 size={18} />
-                    </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-on-surface-variant font-body-md">
-                    Nenhum {activeTab === 'patient' ? 'paciente' : 'terapeuta'} encontrado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-headline-md text-lg font-bold text-on-surface">{user.name}</h4>
+                      {user.id.length < 10 && (
+                        <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full border border-slate-200">
+                          Exemplo
+                        </span>
+                      )}
+                    </div>
+
+                    {user.role === 'patient' ? (
+                      <div className="flex flex-col gap-0.5 mt-1 text-sm text-on-surface-variant">
+                        {user.mother_name && <span><strong className="text-slate-700">Mãe:</strong> {user.mother_name} {user.mother_contact ? `(${user.mother_contact})` : ''}</span>}
+                        {user.father_name && <span><strong className="text-slate-700">Pai:</strong> {user.father_name} {user.father_contact ? `(${user.father_contact})` : ''}</span>}
+                        {user.therapies && user.therapies.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {user.therapies.map(t => (
+                              <span key={t} className="text-xs bg-secondary-container text-secondary font-semibold px-2 py-0.5 rounded-md">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ) : user.role === 'professional' ? (
+                      <p className="text-sm text-primary font-semibold mt-0.5">
+                        {user.specialty || 'Terapeuta'} • <span className="text-on-surface-variant font-normal">{user.contact}</span>
+                      </p>
+                    ) : (
+                      <div className="text-sm mt-0.5">
+                        <span className="text-primary font-bold">{user.position || 'Secretária'}</span>
+                        <span className="text-on-surface-variant ml-2">• {user.contact}</span>
+                        {user.email && <span className="text-slate-400 block text-xs mt-0.5">{user.email}</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end md:self-center">
+                  <button 
+                    onClick={() => handleEdit(user)}
+                    className="p-2.5 hover:bg-surface-variant rounded-xl text-on-surface-variant transition-colors"
+                    title="Editar Cadastro"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(user.id)}
+                    className="p-2.5 hover:bg-error-container text-error rounded-xl transition-colors"
+                    title="Excluir Cadastro"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-12 text-center text-on-surface-variant">
+              Nenhum cadastro encontrado.
+            </div>
+          )}
         </div>
       </div>
 
-      {/* REGISTRATION MODAL */}
+      {/* MODAL DE CADASTRO E EDIÇÃO */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-[650px] shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-[600px] shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
             <button 
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full z-10"
-              disabled={isSaving}
             >
               <X size={20} />
             </button>
             
             <h3 className="font-display-sm text-xl sm:text-2xl font-bold text-slate-800 mb-6 pr-8">
-              {editingId ? 'Editar' : 'Cadastrar Novo'} {activeTab === 'patient' ? 'Paciente' : 'Terapeuta'}
+              {editingId ? 'Editar Cadastro' : activeTab === 'patient' ? 'Novo Paciente' : activeTab === 'professional' ? 'Novo Terapeuta' : 'Nova Secretária/Colaborador'}
             </h3>
-            
-            <form className="space-y-6" onSubmit={handleSave}>
-              
-              {/* ÁREA DE FOTO DE PERFIL */}
-              <div className="flex flex-col items-center justify-center mb-6">
-                <label className="cursor-pointer group relative">
-                  <div className="w-24 h-24 rounded-full bg-slate-100 border-4 border-white shadow-md flex items-center justify-center overflow-hidden transition-all group-hover:shadow-lg group-hover:border-primary/20">
-                    {avatarPreview || formData.avatar_url ? (
-                      <img src={avatarPreview || formData.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
-                    ) : (
-                      <Camera size={32} className="text-slate-300 group-hover:text-primary transition-colors" />
-                    )}
-                  </div>
-                  <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} disabled={isSaving} />
-                </label>
-                <span className="text-xs text-slate-500 mt-2 font-medium">
-                  {avatarPreview ? 'Clique para trocar' : 'Adicionar foto'}
-                </span>
-              </div>
 
-              {/* DADOS GERAIS */}
-              <div>
-                <h4 className="text-sm font-bold text-primary mb-3 border-b border-surface-variant pb-2">Dados Pessoais</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Nome Completo</label>
-                    <input required value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: João da Silva" disabled={isSaving} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">CPF</label>
-                    <input value={formData.cpf || ''} onChange={e => setFormData({...formData, cpf: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="000.000.000-00" disabled={isSaving} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Data de Nascimento</label>
-                    <input value={formData.birthdate || ''} onChange={e => setFormData({...formData, birthdate: e.target.value})} type="date" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" disabled={isSaving} />
-                  </div>
+            <form onSubmit={handleSave} className="space-y-4">
+              
+              {/* UPLOAD DE AVATAR COM FOTO */}
+              <div className="flex items-center gap-4 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="relative w-16 h-16 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center border-2 border-primary/20 shadow-sm shrink-0">
+                  {avatarPreview || formData.avatar_url ? (
+                    <img src={avatarPreview || formData.avatar_url} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera size={24} className="text-slate-400" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Foto de Perfil</label>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleImageChange}
+                    className="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">Otimizada automaticamente para menos de 200 KB.</p>
                 </div>
               </div>
 
-              {activeTab === 'patient' ? (
+              {/* NOME COMPLETO */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                  {activeTab === 'patient' ? 'Nome da Criança / Paciente *' : 'Nome Completo *'}
+                </label>
+                <input 
+                  type="text" 
+                  required
+                  value={formData.name || ''} 
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Ex: João da Silva"
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                />
+              </div>
+
+              {/* CAMPOS ESPECÍFICOS PARA PACIENTE */}
+              {activeTab === 'patient' && (
                 <>
-                  <div>
-                    <h4 className="text-sm font-bold text-primary mb-3 border-b border-surface-variant pb-2">Filiação / Responsáveis</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Nome da Mãe (ou Resp.)</label>
-                        <input value={formData.mother_name || ''} onChange={e => setFormData({...formData, mother_name: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" disabled={isSaving} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Telefone da Mãe/Resp.</label>
-                        <input value={formData.mother_contact || ''} onChange={e => setFormData({...formData, mother_contact: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Nome do Pai</label>
-                        <input value={formData.father_name || ''} onChange={e => setFormData({...formData, father_name: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" disabled={isSaving} />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Telefone do Pai</label>
-                        <input value={formData.father_contact || ''} onChange={e => setFormData({...formData, father_contact: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-bold text-slate-700 mb-1">Outro Contato / Fixo</label>
-                        <input value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Nome da Mãe ou Responsável</label>
+                      <input 
+                        type="text" 
+                        value={formData.mother_name || ''} 
+                        onChange={(e) => setFormData({ ...formData, mother_name: e.target.value })}
+                        placeholder="Nome da mãe"
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp da Mãe</label>
+                      <input 
+                        type="text" 
+                        value={formData.mother_contact || ''} 
+                        onChange={(e) => setFormData({ ...formData, mother_contact: e.target.value })}
+                        placeholder="(00) 00000-0000"
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Nome do Pai</label>
+                      <input 
+                        type="text" 
+                        value={formData.father_name || ''} 
+                        onChange={(e) => setFormData({ ...formData, father_name: e.target.value })}
+                        placeholder="Nome do pai"
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp do Pai</label>
+                      <input 
+                        type="text" 
+                        value={formData.father_contact || ''} 
+                        onChange={(e) => setFormData({ ...formData, father_contact: e.target.value })}
+                        placeholder="(00) 00000-0000"
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                      />
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-bold text-primary mb-3 border-b border-surface-variant pb-2">Terapias Indicadas</h4>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Terapias Indicadas</label>
                     <div className="flex flex-wrap gap-2">
-                      {therapyOptions.map(therapy => {
-                        const isSelected = formData.therapies?.includes(therapy);
-                        return (
-                          <button
-                            key={therapy}
-                            type="button"
-                            disabled={isSaving}
-                            onClick={() => toggleTherapy(therapy)}
-                            className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-colors ${
-                              isSelected 
-                                ? 'bg-primary text-white border-primary shadow-sm' 
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-primary/50'
-                            } disabled:opacity-50`}
-                          >
-                            {therapy}
-                          </button>
-                        );
-                      })}
+                      {therapyOptions.map(t => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => toggleTherapy(t)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                            (formData.therapies || []).includes(t)
+                              ? 'bg-primary text-white shadow-sm'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
                     </div>
-                    <p className="text-xs text-slate-500 mt-2">
-                      As terapias selecionadas direcionarão o paciente automaticamente para a lista dos respectivos profissionais.
-                    </p>
                   </div>
                 </>
-              ) : (
-                <div>
-                  <h4 className="text-sm font-bold text-primary mb-3 border-b border-surface-variant pb-2">Dados Profissionais</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Especialidade</label>
-                      <select required value={formData.specialty || ''} onChange={e => setFormData({...formData, specialty: e.target.value})} className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600 appearance-none" disabled={isSaving}>
-                        <option value="">Selecione...</option>
-                        {therapyOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Registro (CRM/CRP/etc)</label>
-                      <input type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="Ex: CRP 00/00000" disabled={isSaving} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-1">Celular (Contato)</label>
-                      <input required value={formData.contact || ''} onChange={e => setFormData({...formData, contact: e.target.value})} type="text" className="w-full p-2.5 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none" placeholder="(00) 00000-0000" disabled={isSaving} />
-                    </div>
+              )}
+
+              {/* CAMPOS ESPECÍFICOS PARA TERAPEUTA */}
+              {activeTab === 'professional' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Especialidade Principal *</label>
+                    <select
+                      value={formData.specialty || 'Psicologia'}
+                      onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
+                      className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                    >
+                      {therapyOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp / Telefone *</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={formData.contact || ''} 
+                      onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                      placeholder="(00) 00000-0000"
+                      className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                    />
                   </div>
                 </div>
               )}
 
-              <div className="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100 mt-2">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto px-6 py-3 sm:py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors" disabled={isSaving}>
+              {/* CAMPOS ESPECÍFICOS PARA COLABORADOR / SECRETÁRIA */}
+              {activeTab === 'collaborator' && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">Cargo / Função *</label>
+                      <select
+                        value={formData.position || 'Secretária'}
+                        onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                      >
+                        <option value="Secretária">Secretária</option>
+                        <option value="Recepcionista">Recepcionista</option>
+                        <option value="Auxiliar Administrativo">Auxiliar Administrativo</option>
+                        <option value="Financeiro">Assistente Financeiro</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp / Telefone *</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={formData.contact || ''} 
+                        onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                        placeholder="(00) 00000-0000"
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">E-mail de Acesso ao Sistema</label>
+                    <input 
+                      type="email" 
+                      value={formData.email || ''} 
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="secretaria@institutomotivar.com.br"
+                      className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* CPF */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">CPF (Opcional)</label>
+                <input 
+                  type="text" 
+                  value={formData.cpf || ''} 
+                  onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                  placeholder="000.000.000-00"
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                />
+              </div>
+
+              {/* BOTÕES */}
+              <div className="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="w-full sm:w-auto px-6 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                >
                   Cancelar
                 </button>
-                <button type="submit" className="w-full sm:w-auto px-8 py-3 sm:py-2.5 font-bold bg-primary text-white hover:bg-primary/90 rounded-xl shadow-md transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2" disabled={isSaving}>
-                  {isSaving ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Salvando...
-                    </>
-                  ) : (
-                    editingId ? 'Atualizar Cadastro' : 'Salvar'
-                  )}
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="w-full sm:w-auto px-8 py-3 font-bold bg-primary text-white hover:bg-primary/90 rounded-xl shadow-md transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>

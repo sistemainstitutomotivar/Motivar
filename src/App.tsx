@@ -3,7 +3,7 @@ import LandingPage from './components/landing/LandingPage';
 import Dashboard from './components/dashboard/Dashboard';
 import { supabase } from './lib/supabase';
 
-export type UserRole = 'patient' | 'professional' | 'admin' | null;
+export type UserRole = 'patient' | 'professional' | 'secretary' | 'admin' | null;
 
 function App() {
   const [userRole, setUserRole] = useState<UserRole>(null);

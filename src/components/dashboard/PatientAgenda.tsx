@@ -1,236 +1,254 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Calendar, Clock, MapPin, Info, CheckCircle, XCircle } from 'lucide-react';
-
-interface Session {
-  id: string;
-  date: string;
-  time: string;
-  therapistName: string;
-  therapistRole: string;
-  therapistPhoto: string;
-  patientName: string;
-  patientPhoto: string;
-  status: 'scheduled' | 'confirmed' | 'cancelled';
-  location: string;
-}
-
-const mockSessions: Session[] = [
-  {
-    id: '1',
-    date: '25 de Setembro',
-    time: '14:00 - 14:45',
-    therapistName: 'Dra. Mariana Costa',
-    therapistRole: 'Psicologia',
-    therapistPhoto: 'https://lh3.googleusercontent.com/aida-public/AB6AXuATEcXMatvPpblW9g7KZcSMhMPh-nmtzp49A9nxwCd5N3wCXLAGs9Uhq2d7RbbL7o-sUm-G4yz2Lz7RA0uFFve9tsBhg88hoW4FDONEdeOxfbH_AvFZz6a5k8HNwgDTbpRyEZCIfMxBw7d7Uc84x0vocVnEKmy8SvNIXxb1ocXBY6St1PhCUaNBvau0Gcf4KS84Jl7HUdkpjDv-V1KOHBp-_4IgKomFDV-kpWUl-e4jYa7esuglE-Tw',
-    patientName: 'Lucas Matheus Silva',
-    patientPhoto: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB2wTWY3mGuV9l8RmB487xwCEStUlPqivZGaejq_PCw8ylfjhtBGugcgvyH8u9oWbBki6g9FILqOMsWHjd8tLZapYdUSpucbAxLPNKTIqKUYU0-Opc9rq2RnGk4YX5NjEoli2HQgLGpq5_wgZK-gecaAlDKT--U_vneJXhqCdgeCL4omBd2RoAd3Cp2sXJ4CVVjgz9y1uCzDTx9VGmgqFUGrHyaDLYZJFYCB9E37-VnMgmTV0qEsLFn',
-    status: 'scheduled',
-    location: 'Clínica Principal - Sala 04',
-  },
-  {
-    id: '2',
-    date: '28 de Setembro',
-    time: '09:00 - 09:45',
-    therapistName: 'Dr. Roberto Alves',
-    therapistRole: 'Fonoaudiologia',
-    therapistPhoto: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?ixlib=rb-4.0.3&auto=format&fit=crop&w=256&q=80',
-    patientName: 'Lucas Matheus Silva',
-    patientPhoto: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB2wTWY3mGuV9l8RmB487xwCEStUlPqivZGaejq_PCw8ylfjhtBGugcgvyH8u9oWbBki6g9FILqOMsWHjd8tLZapYdUSpucbAxLPNKTIqKUYU0-Opc9rq2RnGk4YX5NjEoli2HQgLGpq5_wgZK-gecaAlDKT--U_vneJXhqCdgeCL4omBd2RoAd3Cp2sXJ4CVVjgz9y1uCzDTx9VGmgqFUGrHyaDLYZJFYCB9E37-VnMgmTV0qEsLFn',
-    status: 'confirmed',
-    location: 'Clínica Principal - Sala 01',
-  }
-];
+import { getAppointments, updateAppointmentStatus } from '../../lib/appointments';
+import type { ClinicAppointment } from '../../lib/appointments';
 
 export default function PatientAgenda() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [justifyingId, setJustifyingId] = useState<string | null>(null);
   const [justification, setJustification] = useState('');
   
-  const [sessions, setSessions] = useState<Session[]>(mockSessions);
+  const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleConfirm = (id: string) => {
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, status: 'confirmed' } : s));
+  // Nome do paciente logado (Lucas Matheus Silva para simulação)
+  const currentPatientName = 'Lucas Matheus Silva';
+
+  useEffect(() => {
+    loadPatientAppointments();
+  }, []);
+
+  const loadPatientAppointments = async () => {
+    setLoading(true);
+    try {
+      const allApts = await getAppointments();
+      // Filtra os agendamentos da Agenda Geral vinculados a este paciente
+      const myApts = allApts.filter(a => 
+        a.patient_name.toLowerCase().includes('lucas') ||
+        a.patient_name === currentPatientName
+      );
+      setAppointments(myApts.length > 0 ? myApts : allApts.slice(0, 2));
+    } catch (err) {
+      console.warn('Erro ao carregar agenda do paciente:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCancel = (id: string) => {
+  const handleConfirm = async (id: string) => {
+    setAppointments(prev => prev.map(s => s.id === id ? { ...s, status: 'confirmed' } : s));
+    const target = appointments.find(a => a.id === id);
+    await updateAppointmentStatus(id, 'confirmed', undefined, target?.patient_name || currentPatientName);
+    alert('Presença confirmada com sucesso! A clínica já foi notificada.');
+  };
+
+  const handleCancel = async (id: string) => {
     if (justification.trim() === '') return;
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, status: 'cancelled' } : s));
+    const target = appointments.find(a => a.id === id);
+    const reason = justification.trim();
+
+    setAppointments(prev => prev.map(s => s.id === id ? { ...s, status: 'cancelled', justification: reason } : s));
     setJustifyingId(null);
     setJustification('');
+
+    await updateAppointmentStatus(id, 'cancelled', reason, target?.patient_name || currentPatientName);
+    alert('Cancelamento registrado na clínica com justificativa salva na auditoria.');
   };
 
   return (
     <div className="w-full flex flex-col gap-6">
       <div className="flex justify-between items-center mb-2">
-        <h3 className="font-headline-md text-on-surface text-2xl font-bold">Minha Agenda</h3>
+        <div>
+          <h3 className="font-headline-md text-on-surface text-2xl font-bold">Minha Agenda</h3>
+          <p className="text-sm text-slate-500">Sincronizada em tempo real com a Agenda Geral da clínica.</p>
+        </div>
       </div>
 
-      {/* Adicionado items-start para evitar que os cards não expandidos estiquem acompanhando a altura do card expandido */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
-        {sessions.map(session => {
-          const isExpanded = expandedId === session.id;
-          const isJustifying = justifyingId === session.id;
+      {loading ? (
+        <div className="p-8 text-center text-slate-500">Carregando seus agendamentos...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+          {appointments.map(session => {
+            const isExpanded = expandedId === session.id;
+            const isJustifying = justifyingId === session.id;
 
-          return (
-            <div 
-              key={session.id} 
-              className={`glass-card rounded-3xl overflow-hidden transition-all duration-300 ease-in-out border ${
-                isExpanded ? 'border-primary shadow-xl scale-[1.02]' : 'border-surface-variant hover:border-primary/50 cursor-pointer shadow-md'
-              } flex flex-col`}
-              onClick={() => !isExpanded && setExpandedId(session.id)}
-            >
-              {/* STATUS INDICATOR BAR */}
-              <div className={`h-2 w-full transition-colors ${
-                session.status === 'confirmed' ? 'bg-[#008537]' : 
-                session.status === 'cancelled' ? 'bg-error' : 
-                'bg-secondary'
-              }`} />
+            return (
+              <div 
+                key={session.id} 
+                className={`glass-card rounded-3xl overflow-hidden transition-all duration-300 ease-in-out border ${
+                  isExpanded ? 'border-primary shadow-xl scale-[1.02]' : 'border-surface-variant hover:border-primary/50 cursor-pointer shadow-md'
+                } flex flex-col`}
+                onClick={() => !isExpanded && setExpandedId(session.id)}
+              >
+                {/* STATUS INDICATOR BAR */}
+                <div className={`h-2 w-full transition-colors ${
+                  session.status === 'confirmed' ? 'bg-[#008537]' : 
+                  session.status === 'cancelled' ? 'bg-error' : 
+                  'bg-secondary'
+                }`} />
 
-              {/* MINI CARD HEADER */}
-              <div className="p-5 flex flex-col gap-4">
-                <div className="flex justify-between items-start">
-                  
-                  {/* IMAGENS E TÍTULO (Dinâmico: Sobreposto ou Separado) */}
-                  <div className={`flex w-full ${isExpanded ? 'flex-col gap-4' : 'items-center gap-3'}`}>
+                {/* MINI CARD HEADER */}
+                <div className="p-5 flex flex-col gap-4">
+                  <div className="flex justify-between items-start">
                     
-                    {/* CONTAINER DE FOTOS */}
-                    <div className={isExpanded ? 'flex items-center gap-6 justify-center w-full bg-surface-container-lowest p-4 rounded-2xl border border-surface-variant' : 'relative shrink-0'}>
-                      {/* Terapeuta */}
-                      <div className={isExpanded ? 'flex flex-col items-center gap-2' : ''}>
-                        <img 
-                          src={session.therapistPhoto} 
-                          alt="Terapeuta" 
-                          className={`object-cover border-2 border-surface shadow-sm rounded-full transition-all duration-300 ${isExpanded ? 'w-20 h-20' : 'w-12 h-12 z-10 relative'}`} 
-                        />
-                        {isExpanded && <span className="font-label-sm text-primary font-bold">Terapeuta</span>}
-                      </div>
+                    {/* IMAGENS E TÍTULO */}
+                    <div className={`flex w-full ${isExpanded ? 'flex-col gap-4' : 'items-center gap-3'}`}>
                       
-                      {/* Paciente */}
-                      <div className={isExpanded ? 'flex flex-col items-center gap-2' : ''}>
-                        <img 
-                          src={session.patientPhoto} 
-                          alt="Paciente" 
-                          className={`object-cover border-2 border-surface shadow-sm rounded-full transition-all duration-300 ${isExpanded ? 'w-20 h-20' : 'w-10 h-10 absolute -bottom-2 -right-3 z-0'}`} 
+                      {/* CONTAINER DE FOTOS */}
+                      <div className={isExpanded ? 'flex items-center gap-6 justify-center w-full bg-surface-container-lowest p-4 rounded-2xl border border-surface-variant' : 'relative shrink-0'}>
+                        {/* Terapeuta */}
+                        <div className={isExpanded ? 'flex flex-col items-center gap-2' : ''}>
+                          {session.therapist_avatar ? (
+                            <img 
+                              src={session.therapist_avatar} 
+                              alt="Terapeuta" 
+                              className={`object-cover border-2 border-surface shadow-sm rounded-full transition-all duration-300 ${isExpanded ? 'w-20 h-20' : 'w-12 h-12 z-10 relative'}`} 
+                            />
+                          ) : (
+                            <div className={`rounded-full bg-primary text-white flex items-center justify-center font-bold shadow-sm ${isExpanded ? 'w-20 h-20 text-2xl' : 'w-12 h-12 z-10 relative text-sm'}`}>
+                              {session.therapist_name.charAt(session.therapist_name.indexOf(' ') + 1 || 0)}
+                            </div>
+                          )}
+                          {isExpanded && <span className="font-label-sm text-primary font-bold">Terapeuta</span>}
+                        </div>
+                        
+                        {/* Paciente */}
+                        <div className={isExpanded ? 'flex flex-col items-center gap-2' : ''}>
+                          {session.patient_avatar ? (
+                            <img 
+                              src={session.patient_avatar} 
+                              alt="Paciente" 
+                              className={`object-cover border-2 border-surface shadow-sm rounded-full transition-all duration-300 ${isExpanded ? 'w-20 h-20' : 'w-10 h-10 absolute -bottom-2 -right-3 z-0'}`} 
+                            />
+                          ) : (
+                            <div className={`rounded-full bg-secondary text-white flex items-center justify-center font-bold shadow-sm ${isExpanded ? 'w-20 h-20 text-2xl' : 'w-10 h-10 absolute -bottom-2 -right-3 z-0 text-xs'}`}>
+                              {session.patient_name.charAt(0)}
+                            </div>
+                          )}
+                          {isExpanded && <span className="font-label-sm text-secondary font-bold">Você</span>}
+                        </div>
+                      </div>
+
+                      {/* NOME E FUNÇÃO */}
+                      <div className={`${isExpanded ? 'text-center w-full' : 'ml-2'}`}>
+                        <h4 className={`font-headline-md font-bold text-on-surface leading-tight ${isExpanded ? 'text-xl' : 'text-[16px]'}`}>
+                          {session.therapist_name}
+                        </h4>
+                        <span className="font-label-sm text-on-surface-variant bg-surface-variant px-2 py-0.5 rounded-md mt-1 inline-block">
+                          {session.room}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {isExpanded && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setExpandedId(null); setJustifyingId(null); }}
+                        className="absolute top-6 right-6 w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error/10 hover:text-error transition-colors z-20"
+                      >
+                        <X size={18} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* HORÁRIO E DATA */}
+                  <div className={`flex items-center gap-4 mt-2 ${isExpanded ? 'justify-center bg-surface-variant/30 p-3 rounded-xl' : ''}`}>
+                    <div className="flex items-center gap-1.5 text-on-surface">
+                      <Calendar size={20} className="text-primary" />
+                      <span className="font-label-md font-bold">{session.date}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-on-surface">
+                      <Clock size={20} className="text-primary" />
+                      <span className="font-label-md">{session.time}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* EXPANDED DETAILS */}
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out bg-surface-container-lowest ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="p-5 border-t border-surface-variant space-y-4">
+                    
+                    <div className="flex items-start gap-2">
+                      <MapPin size={20} className="text-on-surface-variant" />
+                      <div>
+                        <p className="font-label-sm text-on-surface-variant">Local do Atendimento</p>
+                        <p className="font-body-md text-on-surface font-medium">{session.room}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2">
+                      <Info size={20} className="text-on-surface-variant" />
+                      <div>
+                        <p className="font-label-sm text-on-surface-variant">Status da Sessão</p>
+                        <p className={`font-body-md font-bold ${
+                          session.status === 'confirmed' ? 'text-[#008537]' : 
+                          session.status === 'cancelled' ? 'text-error' : 
+                          'text-secondary'
+                        }`}>
+                          {session.status === 'confirmed' ? 'Confirmada (Te aguardamos lá!)' : 
+                           session.status === 'cancelled' ? 'Cancelada' : 
+                           session.status === 'in_progress' ? 'Em andamento na sala' :
+                           'Aguardando sua Confirmação'}
+                        </p>
+                        {session.status === 'cancelled' && session.justification && (
+                          <p className="text-xs text-error mt-1">Motivo: {session.justification}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {session.status === 'pending' && !isJustifying && (
+                      <div className="flex gap-3 pt-4">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleConfirm(session.id); }}
+                          className="flex-1 py-2.5 bg-primary text-on-primary rounded-xl font-label-md font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                        >
+                          <CheckCircle size={20} />
+                          Confirmar Presença
+                        </button>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setJustifyingId(session.id); }}
+                          className="flex-1 py-2.5 bg-error-container text-on-error-container rounded-xl font-label-md font-bold hover:bg-error hover:text-on-error transition-colors flex items-center justify-center gap-2"
+                        >
+                          <XCircle size={20} />
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+
+                    {isJustifying && (
+                      <div className="pt-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+                        <label className="font-label-sm text-on-surface font-bold">Motivo do cancelamento:</label>
+                        <textarea 
+                          className="w-full p-3 rounded-xl border border-error focus:ring-2 focus:ring-error outline-none text-on-surface text-sm bg-surface-container-lowest resize-none"
+                          rows={3}
+                          placeholder="Por favor, informe o motivo para avisarmos a clínica..."
+                          value={justification}
+                          onChange={(e) => setJustification(e.target.value)}
                         />
-                        {isExpanded && <span className="font-label-sm text-secondary font-bold">Você</span>}
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setJustifyingId(null)}
+                            className="flex-1 py-2 bg-surface-variant text-on-surface rounded-xl font-label-sm hover:bg-surface-variant/80 transition-colors"
+                          >
+                            Voltar
+                          </button>
+                          <button 
+                            onClick={() => handleCancel(session.id)}
+                            disabled={!justification.trim()}
+                            className="flex-1 py-2 bg-error text-on-error rounded-xl font-label-sm font-bold hover:bg-error/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Confirmar Cancelamento
+                          </button>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* NOME E FUNÇÃO */}
-                    <div className={`${isExpanded ? 'text-center w-full' : 'ml-2'}`}>
-                      <h4 className={`font-headline-md font-bold text-on-surface leading-tight ${isExpanded ? 'text-xl' : 'text-[16px]'}`}>
-                        {session.therapistName}
-                      </h4>
-                      <span className="font-label-sm text-on-surface-variant bg-surface-variant px-2 py-0.5 rounded-md mt-1 inline-block">
-                        {session.therapistRole}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {isExpanded && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); setExpandedId(null); setJustifyingId(null); }}
-                      className="absolute top-6 right-6 w-8 h-8 rounded-full bg-surface-variant text-on-surface-variant flex items-center justify-center hover:bg-error/10 hover:text-error transition-colors z-20"
-                    >
-                      <X size={18} />
-                    </button>
-                  )}
-                </div>
-
-                {/* HORÁRIO E DATA (Sempre visível) */}
-                <div className={`flex items-center gap-4 mt-2 ${isExpanded ? 'justify-center bg-surface-variant/30 p-3 rounded-xl' : ''}`}>
-                  <div className="flex items-center gap-1.5 text-on-surface">
-                    <Calendar size={20} className="text-primary" />
-                    <span className="font-label-md font-bold">{session.date}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-on-surface">
-                    <Clock size={20} className="text-primary" />
-                    <span className="font-label-md">{session.time}</span>
+                    )}
+                    
                   </div>
                 </div>
               </div>
-
-              {/* EXPANDED DETAILS */}
-              <div className={`overflow-hidden transition-all duration-300 ease-in-out bg-surface-container-lowest ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="p-5 border-t border-surface-variant space-y-4">
-                  
-                  <div className="flex items-start gap-2">
-                    <MapPin size={20} className="text-on-surface-variant" />
-                    <div>
-                      <p className="font-label-sm text-on-surface-variant">Local do Atendimento</p>
-                      <p className="font-body-md text-on-surface font-medium">{session.location}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-2">
-                    <Info size={20} className="text-on-surface-variant" />
-                    <div>
-                      <p className="font-label-sm text-on-surface-variant">Status da Sessão</p>
-                      <p className={`font-body-md font-bold ${
-                        session.status === 'confirmed' ? 'text-[#008537]' : 
-                        session.status === 'cancelled' ? 'text-error' : 
-                        'text-secondary'
-                      }`}>
-                        {session.status === 'confirmed' ? 'Confirmada (Te aguardamos lá!)' : 
-                         session.status === 'cancelled' ? 'Cancelada' : 
-                         'Aguardando sua Confirmação'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {session.status === 'scheduled' && !isJustifying && (
-                    <div className="flex gap-3 pt-4">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleConfirm(session.id); }}
-                        className="flex-1 py-2.5 bg-primary text-on-primary rounded-xl font-label-md font-bold hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                      >
-                        <CheckCircle size={20} />
-                        Confirmar
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); setJustifyingId(session.id); }}
-                        className="flex-1 py-2.5 bg-error-container text-on-error-container rounded-xl font-label-md font-bold hover:bg-error hover:text-on-error transition-colors flex items-center justify-center gap-2"
-                      >
-                        <XCircle size={20} />
-                        Cancelar
-                      </button>
-                    </div>
-                  )}
-
-                  {isJustifying && (
-                    <div className="pt-4 space-y-3" onClick={(e) => e.stopPropagation()}>
-                      <label className="font-label-sm text-on-surface font-bold">Motivo do cancelamento:</label>
-                      <textarea 
-                        className="w-full p-3 rounded-xl border border-error focus:ring-2 focus:ring-error outline-none text-on-surface text-sm bg-surface-container-lowest resize-none"
-                        rows={3}
-                        placeholder="Por favor, informe o motivo para avisarmos a clínica..."
-                        value={justification}
-                        onChange={(e) => setJustification(e.target.value)}
-                      />
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => setJustifyingId(null)}
-                          className="flex-1 py-2 bg-surface-variant text-on-surface rounded-xl font-label-sm hover:bg-surface-variant/80 transition-colors"
-                        >
-                          Voltar
-                        </button>
-                        <button 
-                          onClick={() => handleCancel(session.id)}
-                          disabled={!justification.trim()}
-                          className="flex-1 py-2 bg-error text-on-error rounded-xl font-label-sm font-bold hover:bg-error/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Confirmar Cancelamento
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
