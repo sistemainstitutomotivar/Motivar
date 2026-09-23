@@ -21,12 +21,16 @@ interface MockUser {
   birthdate?: string;
   therapies?: string[]; // Para pacientes
   avatar_url?: string;
+  // Convênio ou Particular
+  payment_type?: 'particular' | 'convenio';
+  insurance_name?: string;
+  insurance_number?: string;
 }
 
 // Dados Fictícios Iniciais
 const initialUsers: MockUser[] = [
-  { id: '1', name: 'Lucas Matheus Silva', role: 'patient', mother_name: 'Maria Silva (Mãe)', contact: '(11) 98888-7777', status: 'active', therapies: ['Psicologia', 'Fonoaudiologia'] },
-  { id: '2', name: 'Pedro Henrique', role: 'patient', father_name: 'João Henrique (Pai)', contact: '(11) 97777-6666', status: 'active', therapies: ['Terapia Ocupacional'] },
+  { id: '1', name: 'Lucas Matheus Silva', role: 'patient', mother_name: 'Maria Silva (Mãe)', contact: '(11) 98888-7777', status: 'active', therapies: ['Psicologia', 'Fonoaudiologia'], payment_type: 'particular' },
+  { id: '2', name: 'Pedro Henrique', role: 'patient', father_name: 'João Henrique (Pai)', contact: '(11) 97777-6666', status: 'active', therapies: ['Terapia Ocupacional'], payment_type: 'convenio', insurance_name: 'Unimed' },
   { id: '3', name: 'Dra. Mariana Costa', role: 'professional', specialty: 'Psicologia', contact: '(11) 96666-5555', status: 'active' },
   { id: '4', name: 'Dr. Roberto Alves', role: 'professional', specialty: 'Fonoaudiologia', contact: '(11) 95555-4444', status: 'active' },
   { id: 'staff-1', name: 'Camila Albuquerque', role: 'collaborator', position: 'Secretária Geral & Recepção', email: 'secretaria@institutomotivar.com.br', contact: '(11) 94444-2222', status: 'active' },
@@ -51,70 +55,90 @@ export default function GestaoCadastros() {
     fetchDbUsers();
   }, [activeTab]);
 
+  const mapPatientRecord = (d: any): MockUser => ({
+    id: d.id,
+    name: d.name,
+    role: 'patient',
+    mother_name: d.mother_name,
+    mother_contact: d.mother_contact,
+    father_name: d.father_name,
+    father_contact: d.father_contact,
+    contact: d.contact || d.mother_contact || d.father_contact || '',
+    status: d.status || 'active',
+    cpf: d.cpf,
+    birthdate: d.birthdate,
+    therapies: d.therapies || [],
+    avatar_url: d.avatar_url,
+    payment_type: d.payment_type || 'particular',
+    insurance_name: d.insurance_name,
+    insurance_number: d.insurance_number,
+  });
+
   const fetchDbUsers = async () => {
-    if (activeTab === 'patient') {
-      const { data, error } = await supabase.from('clinic_patients').select('*').order('created_at', { ascending: false });
-      if (data && !error) {
-        const formatted = data.map(d => ({
-          id: d.id,
-          name: d.name,
-          role: 'patient',
-          mother_name: d.mother_name,
-          mother_contact: d.mother_contact,
-          father_name: d.father_name,
-          father_contact: d.father_contact,
-          contact: d.contact,
-          status: d.status,
-          cpf: d.cpf,
-          birthdate: d.birthdate,
-          therapies: d.therapies,
-          avatar_url: d.avatar_url
-        } as MockUser));
-        setDbUsers(formatted);
-      } else if (error) {
-        console.warn('Tabela clinic_patients pode não existir ainda:', error);
+    try {
+      if (activeTab === 'patient') {
+        const { data, error } = await supabase
+          .from('clinic_patients')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.warn('Tentando busca sem ordenação de created_at:', error.message);
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('clinic_patients')
+            .select('*');
+          if (fallbackData && !fallbackError) {
+            setDbUsers(fallbackData.map(mapPatientRecord));
+          } else {
+            console.error('Erro definitivo ao buscar clinic_patients:', fallbackError);
+          }
+        } else if (data) {
+          setDbUsers(data.map(mapPatientRecord));
+        }
+      } else if (activeTab === 'professional') {
+        const { data, error } = await supabase.from('clinic_therapists').select('*').order('created_at', { ascending: false });
+        if (data && !error) {
+          const formatted = data.map(d => ({
+            id: d.id,
+            name: d.name,
+            role: 'professional',
+            specialty: d.specialty,
+            contact: d.contact,
+            status: d.status,
+            cpf: d.cpf,
+            avatar_url: d.avatar_url
+          } as MockUser));
+          setDbUsers(formatted);
+        } else if (error) {
+          console.warn('Tabela clinic_therapists pode não existir ainda:', error);
+        }
+      } else {
+        // Colaboradores / Secretária
+        const { data, error } = await supabase.from('clinic_staff').select('*').order('created_at', { ascending: false });
+        if (data && !error) {
+          const formatted = data.map(d => ({
+            id: d.id,
+            name: d.name,
+            role: 'collaborator',
+            position: d.position,
+            email: d.email,
+            contact: d.contact,
+            status: d.status,
+            cpf: d.cpf,
+            avatar_url: d.avatar_url
+          } as MockUser));
+          setDbUsers(formatted);
+        } else if (error) {
+          console.warn('Tabela clinic_staff pode não existir ainda:', error);
+        }
       }
-    } else if (activeTab === 'professional') {
-      const { data, error } = await supabase.from('clinic_therapists').select('*').order('created_at', { ascending: false });
-      if (data && !error) {
-        const formatted = data.map(d => ({
-          id: d.id,
-          name: d.name,
-          role: 'professional',
-          specialty: d.specialty,
-          contact: d.contact,
-          status: d.status,
-          cpf: d.cpf,
-          avatar_url: d.avatar_url
-        } as MockUser));
-        setDbUsers(formatted);
-      } else if (error) {
-        console.warn('Tabela clinic_therapists pode não existir ainda:', error);
-      }
-    } else {
-      // Colaboradores / Secretária
-      const { data, error } = await supabase.from('clinic_staff').select('*').order('created_at', { ascending: false });
-      if (data && !error) {
-        const formatted = data.map(d => ({
-          id: d.id,
-          name: d.name,
-          role: 'collaborator',
-          position: d.position,
-          email: d.email,
-          contact: d.contact,
-          status: d.status,
-          cpf: d.cpf,
-          avatar_url: d.avatar_url
-        } as MockUser));
-        setDbUsers(formatted);
-      } else if (error) {
-        console.warn('Tabela clinic_staff pode não existir ainda:', error);
-      }
+    } catch (err) {
+      console.error('Exceção ao buscar cadastros:', err);
     }
   };
 
   const allUsers = [...initialUsers, ...dbUsers];
-  const filteredUsers = allUsers.filter(u => u.role === activeTab && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredUsers = allUsers.filter(u => u.role === activeTab && (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleDelete = async (id: string) => {
     const userToDelete = allUsers.find(u => u.id === id);
@@ -170,6 +194,7 @@ export default function GestaoCadastros() {
       role: activeTab, 
       therapies: [],
       status: 'active',
+      payment_type: 'particular',
       position: activeTab === 'collaborator' ? 'Secretária' : undefined 
     });
     setEditingId(null);
@@ -237,11 +262,14 @@ export default function GestaoCadastros() {
             mother_contact: formData.mother_contact,
             father_name: formData.father_name,
             father_contact: formData.father_contact,
-            contact: formData.contact,
+            contact: formData.contact || formData.mother_contact || '',
             cpf: formData.cpf,
             birthdate: formData.birthdate,
             therapies: formData.therapies,
-            avatar_url: uploadedAvatarUrl
+            avatar_url: uploadedAvatarUrl,
+            payment_type: formData.payment_type || 'particular',
+            insurance_name: formData.payment_type === 'convenio' ? formData.insurance_name : null,
+            insurance_number: formData.payment_type === 'convenio' ? formData.insurance_number : null
           }).eq('id', editingId); 
           if (err1) throw err1;
         } else if (activeTab === 'professional') {
@@ -285,12 +313,15 @@ export default function GestaoCadastros() {
             mother_contact: formData.mother_contact,
             father_name: formData.father_name,
             father_contact: formData.father_contact,
-            contact: formData.contact,
+            contact: formData.contact || formData.mother_contact || '',
             cpf: formData.cpf,
             birthdate: formData.birthdate,
             therapies: formData.therapies || [],
             status: 'active',
-            avatar_url: uploadedAvatarUrl
+            avatar_url: uploadedAvatarUrl,
+            payment_type: formData.payment_type || 'particular',
+            insurance_name: formData.payment_type === 'convenio' ? formData.insurance_name : null,
+            insurance_number: formData.payment_type === 'convenio' ? formData.insurance_number : null
           }]).select(); 
           if (err3) throw err3;
           newRecordId = data?.[0]?.id;
@@ -431,7 +462,7 @@ export default function GestaoCadastros() {
                     <img src={user.avatar_url} alt={user.name} className="w-14 h-14 rounded-full object-cover border-2 border-surface-variant shadow-sm" />
                   ) : (
                     <div className="w-14 h-14 rounded-full bg-primary-container text-primary flex items-center justify-center font-bold text-xl shadow-sm">
-                      {user.name.charAt(0)}
+                      {(user.name || '?').charAt(0)}
                     </div>
                   )}
                   <div>
@@ -445,11 +476,25 @@ export default function GestaoCadastros() {
                     </div>
 
                     {user.role === 'patient' ? (
-                      <div className="flex flex-col gap-0.5 mt-1 text-sm text-on-surface-variant">
+                      <div className="flex flex-col gap-1 mt-1 text-sm text-on-surface-variant">
+                        {/* BADGE CONVÊNIO OU PARTICULAR */}
+                        <div className="flex items-center gap-2">
+                          {user.payment_type === 'convenio' ? (
+                            <span className="text-xs bg-blue-50 text-blue-700 font-bold px-2.5 py-0.5 rounded-full border border-blue-200">
+                              Convênio: {user.insurance_name || 'Convênio Ativo'}
+                              {user.insurance_number ? ` • Matrícula: ${user.insurance_number}` : ''}
+                            </span>
+                          ) : (
+                            <span className="text-xs bg-slate-100 text-slate-700 font-bold px-2.5 py-0.5 rounded-full border border-slate-200">
+                              Particular
+                            </span>
+                          )}
+                        </div>
+
                         {user.mother_name && <span><strong className="text-slate-700">Mãe:</strong> {user.mother_name} {user.mother_contact ? `(${user.mother_contact})` : ''}</span>}
                         {user.father_name && <span><strong className="text-slate-700">Pai:</strong> {user.father_name} {user.father_contact ? `(${user.father_contact})` : ''}</span>}
                         {user.therapies && user.therapies.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
+                          <div className="flex flex-wrap gap-1 mt-1">
                             {user.therapies.map(t => (
                               <span key={t} className="text-xs bg-secondary-container text-secondary font-semibold px-2 py-0.5 rounded-md">
                                 {t}
@@ -546,10 +591,67 @@ export default function GestaoCadastros() {
                   required
                   value={formData.name || ''} 
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ex: João da Silva"
+                  placeholder="Ex: Nicole Santos"
                   className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
                 />
               </div>
+
+              {/* MODALIDADE: PARTICULAR OU CONVÊNIO (APENAS PARA PACIENTES) */}
+              {activeTab === 'patient' && (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <label className="block text-sm font-bold text-slate-700">Modalidade de Atendimento *</label>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, payment_type: 'particular' })}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
+                        (formData.payment_type || 'particular') === 'particular'
+                          ? 'bg-primary text-white border-primary shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      Particular
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, payment_type: 'convenio' })}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
+                        formData.payment_type === 'convenio'
+                          ? 'bg-primary text-white border-primary shadow-sm'
+                          : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      Convênio Médico
+                    </button>
+                  </div>
+
+                  {formData.payment_type === 'convenio' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Nome do Convênio *</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.insurance_name || ''}
+                          onChange={(e) => setFormData({ ...formData, insurance_name: e.target.value })}
+                          placeholder="Ex: Unimed, Bradesco Saúde, Amil, SulAmérica..."
+                          className="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">Nº Carteirinha / Matrícula (Opcional)</label>
+                        <input
+                          type="text"
+                          value={formData.insurance_number || ''}
+                          onChange={(e) => setFormData({ ...formData, insurance_number: e.target.value })}
+                          placeholder="Ex: 0012345678"
+                          className="w-full p-2.5 border border-slate-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* CAMPOS ESPECÍFICOS PARA PACIENTE */}
               {activeTab === 'patient' && (
