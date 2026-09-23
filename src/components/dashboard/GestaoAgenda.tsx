@@ -88,6 +88,25 @@ export default function GestaoAgenda() {
   const [formPrice, setFormPrice] = useState('180');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingAppointmentId, setEditingAppointmentId] = useState<string | null>(null);
+  
+  // Cancelamento
+  const [cancelModalData, setCancelModalData] = useState<{
+    isOpen: boolean;
+    appointmentId: string | null;
+    patientName: string | null;
+    appointmentDate: string | null;
+    appointmentTime: string | null;
+    requestedBy: 'patient' | 'therapist' | 'clinic' | '';
+    reason: string;
+  }>({
+    isOpen: false,
+    appointmentId: null,
+    patientName: null,
+    appointmentDate: null,
+    appointmentTime: null,
+    requestedBy: '',
+    reason: ''
+  });
 
   // Recorrência (Plano Semanal Fixo / Quinzenal / Avulsa)
   const [recurrenceType, setRecurrenceType] = useState<'single' | 'weekly' | 'biweekly'>('single');
@@ -163,61 +182,82 @@ export default function GestaoAgenda() {
 
   // Ações de Status com Auditoria
   const handleStatusChange = async (apt: ClinicAppointment, newStatus: ClinicAppointment['status']) => {
-    let justification: string | undefined = undefined;
-
     if (newStatus === 'cancelled') {
-      const requestedBy = window.prompt("Quem está solicitando este cancelamento?\n\nDigite 1 para PACIENTE\nDigite 2 para CLÍNICA (Terapeuta/Recepção)");
-      if (requestedBy !== '1' && requestedBy !== '2') {
-        alert("Operação cancelada. É necessário informar quem solicitou o cancelamento.");
-        return;
-      }
-
-      const reason = window.prompt('Informe o motivo do cancelamento da sessão:');
-      if (reason === null) return; // Usuário cancelou o prompt
-      if (!reason.trim()) {
-        alert('É obrigatório informar o motivo do cancelamento para fins de auditoria.');
-        return;
-      }
-
-      let statusNote = "";
-
-      if (requestedBy === '1') {
-        // Cancelado pelo PACIENTE (Aplica regra de 24h)
-        const now = new Date();
-        const [year, month, day] = apt.date.split('-').map(Number);
-        const [hours, minutes] = apt.time.split(':').map(Number);
-        const aptDateTime = new Date(year, month - 1, day, hours, minutes);
-        
-        const diffMs = aptDateTime.getTime() - now.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-
-        if (diffHours < 24) {
-          statusNote = "[CANCELADO PELO PACIENTE < 24H: Faturado]";
-          const isPast = diffHours < 0;
-          const confirmCancel = window.confirm(
-            `Atenção: Este cancelamento solicitado pelo PACIENTE está sendo feito com menos de 24h de antecedência (${
-              isPast ? 'Sessão já ocorreu ou está no horário' : Math.floor(diffHours) + 'h restantes'
-            }).\n\nSegundo a política da clínica, a sessão será faturada normalmente.\n\nDeseja prosseguir?`
-          );
-          if (!confirmCancel) return;
-        } else {
-          statusNote = "[CANCELADO PELO PACIENTE > 24H: Reagendamento Permitido]";
-          alert(`O paciente cancelou dentro do prazo (mais de 24h).\n\nA sessão não será cobrada e está liberada para reagendamento.`);
-        }
-      } else {
-        // Cancelado pela CLÍNICA (Sempre reagenda, sem faturar contra o paciente)
-        statusNote = "[CANCELADO PELA CLÍNICA: Reagendamento Permitido]";
-        alert(`Cancelamento por parte da CLÍNICA registrado.\n\nComo a indisponibilidade foi da clínica/terapeuta, o paciente tem direito ao reagendamento da sessão.`);
-      }
-
-      justification = `${statusNote} ${reason.trim()}`;
+      openCancelModal(apt);
+      return;
     }
+
+    let justification: string | undefined = undefined;
 
     // Atualiza estado visual
     setAppointments(prev => prev.map(a => a.id === apt.id ? { ...a, status: newStatus, justification } : a));
 
     // Persiste no banco e gera log
     await updateAppointmentStatus(apt.id, newStatus, justification, apt.patient_name);
+  };
+
+  const openCancelModal = (apt: ClinicAppointment) => {
+    setCancelModalData({
+      isOpen: true,
+      appointmentId: apt.id,
+      patientName: apt.patient_name,
+      appointmentDate: apt.date,
+      appointmentTime: apt.time,
+      requestedBy: '',
+      reason: ''
+    });
+  };
+
+  const confirmCancellation = async () => {
+    const { appointmentId, requestedBy, reason, appointmentDate, appointmentTime, patientName } = cancelModalData;
+    if (!requestedBy) {
+      alert("Selecione quem solicitou o cancelamento.");
+      return;
+    }
+    if (!reason.trim()) {
+      alert("Informe a observação/motivo do cancelamento.");
+      return;
+    }
+    if (!appointmentId || !appointmentDate || !appointmentTime) return;
+
+    let statusNote = "";
+
+    if (requestedBy === 'patient') {
+      const now = new Date();
+      const [year, month, day] = appointmentDate.split('-').map(Number);
+      const [hours, minutes] = appointmentTime.split(':').map(Number);
+      const aptDateTime = new Date(year, month - 1, day, hours, minutes);
+      
+      const diffMs = aptDateTime.getTime() - now.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      if (diffHours < 24) {
+        statusNote = "[CANCELADO PELO PACIENTE < 24H: Faturado]";
+        const isPast = diffHours < 0;
+        const confirmCancel = window.confirm(
+          `Atenção: Este cancelamento solicitado pelo PACIENTE está sendo feito com menos de 24h de antecedência (${
+            isPast ? 'Sessão já ocorreu ou está no horário' : Math.floor(diffHours) + 'h restantes'
+          }).\n\nSegundo a política da clínica, a sessão será faturada normalmente.\n\nDeseja prosseguir?`
+        );
+        if (!confirmCancel) return;
+      } else {
+        statusNote = "[CANCELADO PELO PACIENTE > 24H: Reagendamento Permitido]";
+      }
+    } else {
+      const origin = requestedBy === 'therapist' ? 'TERAPEUTA' : 'CLÍNICA';
+      statusNote = `[CANCELADO PELA ${origin}: Reagendamento Permitido]`;
+    }
+
+    const finalJustification = `${statusNote} ${reason.trim()}`;
+
+    // Atualiza estado visual
+    setAppointments(prev => prev.map(a => a.id === appointmentId ? { ...a, status: 'cancelled', justification: finalJustification } : a));
+
+    // Persiste no banco e gera log
+    await updateAppointmentStatus(appointmentId, 'cancelled', finalJustification, patientName || undefined);
+    
+    // Fecha modal
+    setCancelModalData(prev => ({ ...prev, isOpen: false }));
   };
 
   const handleEditAppointment = (apt: ClinicAppointment) => {
@@ -867,6 +907,101 @@ export default function GestaoAgenda() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CANCELAMENTO */}
+      {cancelModalData.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-[500px] shadow-2xl relative flex flex-col">
+            <button 
+              onClick={() => setCancelModalData(prev => ({ ...prev, isOpen: false }))}
+              className="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full z-10"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-6 pr-8">
+              <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center text-error">
+                <XCircle size={24} />
+              </div>
+              <h3 className="font-display-sm text-xl sm:text-2xl font-bold text-slate-800">
+                Cancelar Sessão
+              </h3>
+            </div>
+
+            <div className="bg-surface-variant/30 p-4 rounded-xl mb-6">
+              <p className="text-sm text-on-surface-variant mb-1">
+                <span className="font-bold text-slate-700">Paciente:</span> {cancelModalData.patientName}
+              </p>
+              <p className="text-sm text-on-surface-variant">
+                <span className="font-bold text-slate-700">Data/Hora:</span> {cancelModalData.appointmentDate} às {cancelModalData.appointmentTime}
+              </p>
+            </div>
+            
+            <div className="space-y-4 flex-1">
+              {/* Origem do Cancelamento */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Quem solicitou o cancelamento? *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCancelModalData(prev => ({ ...prev, requestedBy: 'patient' }))}
+                    className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                      cancelModalData.requestedBy === 'patient'
+                        ? 'border-error bg-error/10 text-error ring-2 ring-error/20 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                    }`}
+                  >
+                    <span className="text-sm font-bold">O Paciente</span>
+                    <span className="text-[11px] font-normal opacity-80">Sujeito a cobrança se &lt; 24h</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCancelModalData(prev => ({ ...prev, requestedBy: 'clinic' }))}
+                    className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                      cancelModalData.requestedBy === 'clinic' || cancelModalData.requestedBy === 'therapist'
+                        ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                    }`}
+                  >
+                    <span className="text-sm font-bold">A Clínica / Terapeuta</span>
+                    <span className="text-[11px] font-normal opacity-80">Isenta o paciente (reagendamento)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Justificativa */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Motivo / Observação *</label>
+                <textarea
+                  value={cancelModalData.reason}
+                  onChange={(e) => setCancelModalData(prev => ({ ...prev, reason: e.target.value }))}
+                  rows={3}
+                  placeholder="Ex: Cancelado pelo paciente via telefone..."
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-error outline-none text-slate-700 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="pt-6 flex justify-end gap-3 border-t border-slate-100 mt-6">
+              <button 
+                type="button" 
+                onClick={() => setCancelModalData(prev => ({ ...prev, isOpen: false }))} 
+                className="px-6 py-2.5 font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Voltar
+              </button>
+              <button 
+                type="button" 
+                onClick={confirmCancellation}
+                disabled={!cancelModalData.requestedBy || !cancelModalData.reason.trim()}
+                className="px-6 py-2.5 font-bold bg-error text-white hover:bg-error/90 rounded-xl shadow-md transition-colors disabled:opacity-50"
+              >
+                Confirmar Cancelamento
+              </button>
+            </div>
           </div>
         </div>
       )}
