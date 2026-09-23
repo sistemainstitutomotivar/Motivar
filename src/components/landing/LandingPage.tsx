@@ -27,7 +27,7 @@ export default function LandingPage() {
       <div id="tour-clinica" className="w-full min-h-[50vh] bg-slate-900 flex flex-col items-center justify-center py-20 text-slate-400 text-center border-y border-slate-800">
         <span className="material-symbols-outlined text-4xl mb-4">movie</span>
         <h3 className="text-2xl font-bold text-white mb-2">Adentrando a Clínica</h3>
-        <p className="max-w-md">Espaço reservado para o vídeo Scrollytelling de entrada pela porta até a recepção/corredor.</p>
+        <p className="max-w-[448px]">Espaço reservado para o vídeo Scrollytelling de entrada pela porta até a recepção/corredor.</p>
       </div>
 
       <div id="especialidades">

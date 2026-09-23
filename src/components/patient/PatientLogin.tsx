@@ -191,8 +191,8 @@ export default function PatientLogin({ onLoginSuccess, onBack }: PatientLoginPro
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[448px]">
         <div className="flex justify-center">
           <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center">
             <Lock className="h-8 w-8 text-white" />
@@ -209,7 +209,7 @@ export default function PatientLogin({ onLoginSuccess, onBack }: PatientLoginPro
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="mt-8 mx-auto w-full max-w-[448px]">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           
           {error && (
