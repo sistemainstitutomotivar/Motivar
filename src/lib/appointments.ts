@@ -17,7 +17,15 @@ export interface ClinicAppointment {
   justification?: string;
   price?: number;
   payment_status?: 'paid' | 'pending';
+  recurrence_type?: 'single' | 'weekly' | 'biweekly';
+  recurrence_group_id?: string;
   created_at?: string;
+}
+
+export interface RecurringSlot {
+  dayOfWeek: number; // 0 = Domingo, 1 = Segunda, 2 = Terça, 3 = Quarta, 4 = Quinta, 5 = Sexta, 6 = Sábado
+  time: string; // HH:mm
+  room?: string;
 }
 
 // Datas relativas para garantir que o mock sempre tenha dados hoje/amanhã/ontem
@@ -45,7 +53,8 @@ export const initialMockAppointments: ClinicAppointment[] = [
     room: 'Sala 01 - Principal', 
     status: 'confirmed',
     price: 180,
-    payment_status: 'paid'
+    payment_status: 'paid',
+    recurrence_type: 'weekly'
   },
   { 
     id: 'mock-2', 
@@ -59,7 +68,8 @@ export const initialMockAppointments: ClinicAppointment[] = [
     room: 'Sala 02 - Integração Sensorial', 
     status: 'pending',
     price: 200,
-    payment_status: 'pending'
+    payment_status: 'pending',
+    recurrence_type: 'weekly'
   },
   { 
     id: 'mock-3', 
@@ -73,7 +83,8 @@ export const initialMockAppointments: ClinicAppointment[] = [
     status: 'cancelled', 
     justification: 'Paciente amanheceu com febre.',
     price: 180,
-    payment_status: 'pending'
+    payment_status: 'pending',
+    recurrence_type: 'biweekly'
   },
   { 
     id: 'mock-6', 
@@ -87,7 +98,8 @@ export const initialMockAppointments: ClinicAppointment[] = [
     room: 'Sala 03', 
     status: 'in_progress',
     price: 180,
-    payment_status: 'paid'
+    payment_status: 'paid',
+    recurrence_type: 'single'
   },
   { 
     id: 'mock-4', 
@@ -99,7 +111,8 @@ export const initialMockAppointments: ClinicAppointment[] = [
     room: 'Sala 02 - Integração Sensorial', 
     status: 'confirmed',
     price: 180,
-    payment_status: 'pending'
+    payment_status: 'pending',
+    recurrence_type: 'weekly'
   },
   { 
     id: 'mock-5', 
@@ -111,7 +124,8 @@ export const initialMockAppointments: ClinicAppointment[] = [
     room: 'Sala 04', 
     status: 'confirmed',
     price: 200,
-    payment_status: 'paid'
+    payment_status: 'paid',
+    recurrence_type: 'single'
   },
 ];
 
@@ -132,7 +146,6 @@ export async function getAppointments(): Promise<ClinicAppointment[]> {
     }
 
     if (data && data.length > 0) {
-      // Mescla os agendamentos reais do banco com os de demonstração sem duplicar id
       const dbIds = new Set(data.map(d => d.id));
       const remainingMocks = initialMockAppointments.filter(m => !dbIds.has(m.id));
       return [...data, ...remainingMocks];
@@ -146,7 +159,77 @@ export async function getAppointments(): Promise<ClinicAppointment[]> {
 }
 
 /**
- * Cria um novo agendamento e registra na trilha de auditoria
+ * Gera ocorrências para planos de agendamento (Avulsa, Semanal com múltiplos dias, Quinzenal)
+ */
+export function generateOccurrences(
+  base: Omit<ClinicAppointment, 'id' | 'created_at'>,
+  recurrenceType: 'single' | 'weekly' | 'biweekly',
+  periodWeeks: number, // 4, 8, 12, 24
+  additionalSlots: RecurringSlot[] = []
+): Omit<ClinicAppointment, 'id' | 'created_at'>[] {
+  if (recurrenceType === 'single') {
+    return [{ ...base, recurrence_type: 'single' }];
+  }
+
+  const groupId = crypto.randomUUID();
+  const results: Omit<ClinicAppointment, 'id' | 'created_at'>[] = [];
+  
+  // Data base de início
+  const [year, month, day] = base.date.split('-').map(Number);
+  const startObj = new Date(year, month - 1, day, 12, 0, 0);
+  
+  if (recurrenceType === 'biweekly') {
+    const totalSessions = Math.max(1, Math.floor(periodWeeks / 2));
+    for (let i = 0; i < totalSessions; i++) {
+      const curDate = new Date(startObj);
+      curDate.setDate(curDate.getDate() + (i * 14));
+      const dateStr = curDate.toISOString().split('T')[0];
+      results.push({
+        ...base,
+        date: dateStr,
+        recurrence_type: 'biweekly',
+        recurrence_group_id: groupId,
+      });
+    }
+    return results;
+  }
+
+  // recurrenceType === 'weekly'
+  const baseDayOfWeek = startObj.getDay();
+
+  for (let w = 0; w < periodWeeks; w++) {
+    // 1. Sessão principal da semana
+    const curDate = new Date(startObj);
+    curDate.setDate(curDate.getDate() + (w * 7));
+    results.push({
+      ...base,
+      date: curDate.toISOString().split('T')[0],
+      recurrence_type: 'weekly',
+      recurrence_group_id: groupId,
+    });
+
+    // 2. Dias adicionais na semana (ex: Quarta 15h, Sexta 17h)
+    for (const slot of additionalSlots) {
+      let diffDays = slot.dayOfWeek - baseDayOfWeek;
+      const slotDate = new Date(curDate);
+      slotDate.setDate(slotDate.getDate() + diffDays);
+      results.push({
+        ...base,
+        date: slotDate.toISOString().split('T')[0],
+        time: slot.time,
+        room: slot.room || base.room,
+        recurrence_type: 'weekly',
+        recurrence_group_id: groupId,
+      });
+    }
+  }
+
+  results.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  return results;
+}
+
+/**
+ * Cria um único agendamento e registra na trilha de auditoria
  */
 export async function createAppointment(apt: Omit<ClinicAppointment, 'id' | 'created_at'>): Promise<ClinicAppointment> {
   const newAppointment: ClinicAppointment = {
@@ -183,11 +266,58 @@ export async function createAppointment(apt: Omit<ClinicAppointment, 'id' | 'cre
       data: newAppointment.date,
       horario: newAppointment.time,
       sala: newAppointment.room,
-      valor: newAppointment.price
+      valor: newAppointment.price,
+      tipo_recorrencia: newAppointment.recurrence_type || 'single'
     }
   });
 
   return newAppointment;
+}
+
+/**
+ * Cria um lote de agendamentos (plano fixo semanal ou quinzenal) com auditoria
+ */
+export async function createBatchAppointments(
+  apts: Omit<ClinicAppointment, 'id' | 'created_at'>[]
+): Promise<ClinicAppointment[]> {
+  const newAppointments: ClinicAppointment[] = apts.map(apt => ({
+    ...apt,
+    id: crypto.randomUUID(),
+    created_at: new Date().toISOString()
+  }));
+
+  try {
+    const { data, error } = await supabase
+      .from('clinic_appointments')
+      .insert(newAppointments)
+      .select();
+
+    if (error) {
+      console.warn('Aviso: gravando agendamentos apenas localmente:', error.message);
+    } else if (data && data.length > 0) {
+      return data;
+    }
+  } catch (err) {
+    console.warn('Erro ao persistir lote de agendamentos no Supabase:', err);
+  }
+
+  const first = newAppointments[0];
+  await logAuditEvent({
+    action: 'CRIACAO',
+    entity_type: 'agendamento',
+    entity_id: first.recurrence_group_id || first.id,
+    entity_name: `Plano Fixo (${newAppointments.length} sessões): ${first.patient_name}`,
+    details: {
+      paciente: first.patient_name,
+      terapeuta: first.therapist_name,
+      total_sessoes: newAppointments.length,
+      tipo_recorrencia: first.recurrence_type || 'weekly',
+      primeira_data: first.date,
+      ultima_data: newAppointments[newAppointments.length - 1].date
+    }
+  });
+
+  return newAppointments;
 }
 
 /**
@@ -215,7 +345,6 @@ export async function updateAppointmentStatus(
     console.warn('Erro ao atualizar agendamento:', err);
   }
 
-  // Registra log de auditoria
   const actionType = status === 'confirmed' 
     ? 'CONFIRMACAO_AGENDAMENTO' 
     : status === 'cancelled' 

@@ -142,11 +142,15 @@ USING (true)
 WITH CHECK (true);
 
 
--- 6. ATUALIZAÇÃO DA TABELA DE PACIENTES (CAMPOS DE CONVÊNIO E CORREÇÃO DE VISIBILIDADE)
+-- 6. ATUALIZAÇÃO DE PACIENTES E AGENDAMENTOS (CONVÊNIOS E PLANOS RECORRENTES)
 -- Adiciona colunas para Convênio Médico / Particular
 ALTER TABLE public.clinic_patients ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'particular';
 ALTER TABLE public.clinic_patients ADD COLUMN IF NOT EXISTS insurance_name TEXT;
 ALTER TABLE public.clinic_patients ADD COLUMN IF NOT EXISTS insurance_number TEXT;
+
+-- Adiciona suporte a planos recorrentes (Semanal Fixo com múltiplos dias, Quinzenal, Avulso)
+ALTER TABLE public.clinic_appointments ADD COLUMN IF NOT EXISTS recurrence_type TEXT DEFAULT 'single';
+ALTER TABLE public.clinic_appointments ADD COLUMN IF NOT EXISTS recurrence_group_id TEXT;
 
 -- Corrige a função de verificação de permissão
 CREATE OR REPLACE FUNCTION public.get_my_role()

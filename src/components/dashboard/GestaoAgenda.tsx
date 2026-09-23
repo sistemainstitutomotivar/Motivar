@@ -1,11 +1,30 @@
 import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Activity, Play } from 'lucide-react';
+import { 
+  Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, 
+  Clock, MapPin, ChevronLeft, ChevronRight, X, Activity, Play,
+  Repeat, CalendarRange, Sparkles, Trash2
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { getAppointments, createAppointment, updateAppointmentStatus } from '../../lib/appointments';
-import type { ClinicAppointment } from '../../lib/appointments';
+import { 
+  getAppointments, 
+  createAppointment, 
+  createBatchAppointments, 
+  generateOccurrences, 
+  updateAppointmentStatus 
+} from '../../lib/appointments';
+import type { ClinicAppointment, RecurringSlot } from '../../lib/appointments';
 
 const today = new Date();
 const formatYMD = (d: Date) => d.toISOString().split('T')[0];
+
+const DAYS_OF_WEEK = [
+  { value: 1, label: 'Segunda-feira' },
+  { value: 2, label: 'Terça-feira' },
+  { value: 3, label: 'Quarta-feira' },
+  { value: 4, label: 'Quinta-feira' },
+  { value: 5, label: 'Sexta-feira' },
+  { value: 6, label: 'Sábado' },
+];
 
 function SessionProgressBar({ startTime, durationMinutes = 50 }: { startTime: string, durationMinutes?: number }) {
   const [progress, setProgress] = useState(0);
@@ -56,6 +75,7 @@ export default function GestaoAgenda() {
   // Estados dos Filtros
   const [selectedDate, setSelectedDate] = useState<Date>(today);
   const [therapistFilter, setTherapistFilter] = useState('Todos os Terapeutas');
+  const [recurrenceFilter, setRecurrenceFilter] = useState<'all' | 'single' | 'weekly' | 'biweekly'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Formulário de Novo Agendamento
@@ -66,6 +86,11 @@ export default function GestaoAgenda() {
   const [formRoom, setFormRoom] = useState('Sala 01 - Principal');
   const [formPrice, setFormPrice] = useState('180');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Recorrência (Plano Semanal Fixo / Quinzenal / Avulsa)
+  const [recurrenceType, setRecurrenceType] = useState<'single' | 'weekly' | 'biweekly'>('single');
+  const [periodWeeks, setPeriodWeeks] = useState<number>(12); // Padrão: 12 semanas (3 meses)
+  const [additionalSlots, setAdditionalSlots] = useState<RecurringSlot[]>([]);
 
   useEffect(() => {
     loadData();
@@ -155,7 +180,7 @@ export default function GestaoAgenda() {
     await updateAppointmentStatus(apt.id, newStatus, justification, apt.patient_name);
   };
 
-  // Salvar Novo Agendamento
+  // Salvar Novo Agendamento (Avulso ou Lote Recorrente)
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPatient || !formTherapist || !formDate || !formTime) {
@@ -168,7 +193,7 @@ export default function GestaoAgenda() {
       const selectedPatientObj = patientsList.find(p => p.name === formPatient);
       const selectedTherapistObj = therapistsList.find(t => t.name === formTherapist);
 
-      const created = await createAppointment({
+      const baseAppointmentData = {
         date: formDate,
         time: formTime,
         duration_minutes: 50,
@@ -179,18 +204,39 @@ export default function GestaoAgenda() {
         therapist_name: formTherapist,
         therapist_avatar: selectedTherapistObj?.avatar_url,
         room: formRoom,
-        status: 'confirmed',
+        status: 'confirmed' as const,
         price: parseFloat(formPrice) || 180,
-        payment_status: 'pending'
-      });
+        payment_status: 'pending' as const,
+      };
 
-      setAppointments(prev => [created, ...prev]);
+      if (recurrenceType === 'single') {
+        const created = await createAppointment({
+          ...baseAppointmentData,
+          recurrence_type: 'single'
+        });
+        setAppointments(prev => [created, ...prev]);
+        alert('Agendamento avulso realizado e registrado na trilha de auditoria com sucesso!');
+      } else {
+        const occurrences = generateOccurrences(
+          baseAppointmentData,
+          recurrenceType,
+          periodWeeks,
+          additionalSlots
+        );
+        const createdBatch = await createBatchAppointments(occurrences);
+        setAppointments(prev => [...createdBatch, ...prev]);
+        const modalityLabel = recurrenceType === 'weekly' ? 'Semanal Fixo' : 'Quinzenal';
+        alert(`Plano ${modalityLabel} criado com sucesso! ${createdBatch.length} sessões agendadas e registradas na auditoria.`);
+      }
+
       setIsModalOpen(false);
 
       // Reseta formulário
       setFormPatient('');
       setFormTherapist('');
-      alert('Agendamento realizado e registrado na trilha de auditoria com sucesso!');
+      setRecurrenceType('single');
+      setAdditionalSlots([]);
+      setPeriodWeeks(12);
     } catch (err) {
       console.error(err);
       alert('Ocorreu um erro ao salvar o agendamento.');
@@ -203,8 +249,9 @@ export default function GestaoAgenda() {
   const filteredAppointments = appointments.filter(apt => {
     const matchesDate = apt.date === formatYMD(selectedDate);
     const matchesTherapist = therapistFilter === 'Todos os Terapeutas' || apt.therapist_name === therapistFilter;
+    const matchesRecurrence = recurrenceFilter === 'all' || (apt.recurrence_type || 'single') === recurrenceFilter;
     const matchesSearch = apt.patient_name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesDate && matchesTherapist && matchesSearch;
+    return matchesDate && matchesTherapist && matchesRecurrence && matchesSearch;
   });
 
   const sortedAppointments = [...filteredAppointments].sort((a, b) => a.time.localeCompare(b.time));
@@ -248,7 +295,8 @@ export default function GestaoAgenda() {
 
         {/* Filters & Search */}
         <div className="flex flex-col md:flex-row w-full xl:w-auto gap-3">
-          <div className="relative flex-1 md:w-64">
+          {/* Filtro por Terapeuta */}
+          <div className="relative flex-1 md:w-56">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" size={16} />
             <select 
               value={therapistFilter}
@@ -261,7 +309,24 @@ export default function GestaoAgenda() {
               ))}
             </select>
           </div>
-          <div className="relative flex-1 md:w-72">
+
+          {/* Filtro por Tipo de Recorrência */}
+          <div className="relative flex-1 md:w-44">
+            <Repeat className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" size={16} />
+            <select 
+              value={recurrenceFilter}
+              onChange={(e) => setRecurrenceFilter(e.target.value as any)}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-surface-variant rounded-xl focus:ring-2 focus:ring-primary outline-none font-body-sm text-on-surface appearance-none"
+            >
+              <option value="all">Todos os Planos</option>
+              <option value="weekly">Semanal Fixo</option>
+              <option value="biweekly">Quinzenal</option>
+              <option value="single">Avulsa</option>
+            </select>
+          </div>
+
+          {/* Busca por Paciente */}
+          <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" size={16} />
             <input 
               type="text" 
@@ -279,7 +344,7 @@ export default function GestaoAgenda() {
         {/* Table Header */}
         <div className="grid grid-cols-12 gap-4 p-4 bg-surface-container-lowest border-b border-surface-variant font-label-sm font-bold text-on-surface-variant uppercase tracking-wider hidden md:grid">
           <div className="col-span-1 text-center">Hora</div>
-          <div className="col-span-3">Paciente</div>
+          <div className="col-span-3">Paciente & Plano</div>
           <div className="col-span-3">Terapeuta</div>
           <div className="col-span-2">Local</div>
           <div className="col-span-3">Status & Ações</div>
@@ -296,18 +361,33 @@ export default function GestaoAgenda() {
                   {apt.time}
                 </div>
                 
-                {/* Paciente Column com Avatar */}
+                {/* Paciente Column com Avatar e Tipo de Plano */}
                 <div className="col-span-3 flex items-center gap-3">
                   {apt.patient_avatar ? (
-                    <img src={apt.patient_avatar} alt={apt.patient_name} className="w-10 h-10 rounded-full object-cover border border-surface-variant shadow-sm" />
+                    <img src={apt.patient_avatar} alt={apt.patient_name} className="w-10 h-10 rounded-full object-cover border border-surface-variant shadow-sm shrink-0" />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-secondary-container text-secondary flex items-center justify-center font-bold text-sm shadow-sm">
+                    <div className="w-10 h-10 rounded-full bg-secondary-container text-secondary flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
                       {apt.patient_name.charAt(0)}
                     </div>
                   )}
                   <div className="flex flex-col">
                     <span className="font-label-md font-bold text-on-surface">{apt.patient_name}</span>
-                    <span className="md:hidden font-body-sm text-on-surface-variant">Paciente</span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {apt.recurrence_type === 'weekly' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200" title="Terapia semanal fixa">
+                          <Repeat size={10} /> Semanal Fixo
+                        </span>
+                      ) : apt.recurrence_type === 'biweekly' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200" title="Terapia quinzenal">
+                          <CalendarRange size={10} /> Quinzenal
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200" title="Sessão avulsa">
+                          <Clock size={10} /> Avulsa
+                        </span>
+                      )}
+                      <span className="md:hidden font-body-sm text-on-surface-variant">Paciente</span>
+                    </div>
                   </div>
                 </div>
                 
@@ -453,9 +533,166 @@ export default function GestaoAgenda() {
                 </select>
               </div>
 
+              {/* Modalidade / Frequência da Terapia */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2">Frequência / Tipo de Agenda *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRecurrenceType('single')}
+                    className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                      recurrenceType === 'single'
+                        ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <Clock size={15} />
+                      <span>Sessão Avulsa</span>
+                    </div>
+                    <span className="text-[11px] font-normal text-slate-500">Consulta única ou avaliação</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRecurrenceType('weekly')}
+                    className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                      recurrenceType === 'weekly'
+                        ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <Repeat size={15} />
+                      <span>Terapia Semanal</span>
+                    </div>
+                    <span className="text-[11px] font-normal text-slate-500">Dias e horários fixos</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRecurrenceType('biweekly')}
+                    className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                      recurrenceType === 'biweekly'
+                        ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <CalendarRange size={15} />
+                      <span>Terapia Quinzenal</span>
+                    </div>
+                    <span className="text-[11px] font-normal text-slate-500">A cada 15 dias</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Configurações extras de Plano Recorrente */}
+              {recurrenceType !== 'single' && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700">Duração do Contrato / Plano</label>
+                      <p className="text-[11px] text-slate-500">Período de semanas a serem pré-agendadas</p>
+                    </div>
+                    <select
+                      value={periodWeeks}
+                      onChange={(e) => setPeriodWeeks(Number(e.target.value))}
+                      className="p-2 text-xs font-bold bg-white border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value={4}>4 semanas (1 mês)</option>
+                      <option value={8}>8 semanas (2 meses)</option>
+                      <option value={12}>12 semanas (3 meses - Trimestre)</option>
+                      <option value={24}>24 semanas (6 meses - Semestre)</option>
+                    </select>
+                  </div>
+
+                  {/* Dias adicionais na semana (ex: Segunda 14h, Quarta 15h, Sexta 17h) */}
+                  {recurrenceType === 'weekly' && (
+                    <div className="pt-2 border-t border-slate-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-700">Grade Semanal do Paciente:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdditionalSlots(prev => [...prev, { dayOfWeek: 3, time: '14:00', room: formRoom }]);
+                          }}
+                          className="text-xs text-primary hover:text-primary/80 font-bold flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-primary/30 shadow-sm"
+                        >
+                          <Plus size={13} />
+                          Adicionar outro dia fixo
+                        </button>
+                      </div>
+
+                      <div className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200 mb-2 flex items-center justify-between">
+                        <div>
+                          <span className="font-bold text-primary">1º Horário:</span>{' '}
+                          {formDate ? new Date(`${formDate}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long' }) : 'Dia inicial'} às {formTime}
+                        </div>
+                        <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">Principal</span>
+                      </div>
+
+                      {additionalSlots.map((slot, idx) => (
+                        <div key={idx} className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200 mb-2">
+                          <span className="text-xs font-bold text-slate-500">{idx + 2}º Horário:</span>
+                          <select
+                            value={slot.dayOfWeek}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setAdditionalSlots(prev => prev.map((s, i) => i === idx ? { ...s, dayOfWeek: val } : s));
+                            }}
+                            className="text-xs p-1.5 border border-slate-300 rounded-lg bg-slate-50 font-medium text-slate-700"
+                          >
+                            {DAYS_OF_WEEK.map(d => (
+                              <option key={d.value} value={d.value}>{d.label}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="time"
+                            value={slot.time}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdditionalSlots(prev => prev.map((s, i) => i === idx ? { ...s, time: val } : s));
+                            }}
+                            className="text-xs p-1.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setAdditionalSlots(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 ml-auto"
+                            title="Remover este dia"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Resumo Dinâmico do Lote */}
+                  <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 flex items-start gap-2.5">
+                    <Sparkles size={16} className="text-primary mt-0.5 shrink-0" />
+                    <div className="text-xs text-primary leading-relaxed">
+                      <strong>Resumo do Plano:</strong>{' '}
+                      {recurrenceType === 'weekly' ? (
+                        <span>
+                          Serão geradas <strong>{(1 + additionalSlots.length) * periodWeeks} sessões</strong> fixas ({1 + additionalSlots.length}x na semana por {periodWeeks} semanas) diretamente na Agenda Geral.
+                        </span>
+                      ) : (
+                        <span>
+                          Serão geradas <strong>{Math.max(1, Math.floor(periodWeeks / 2))} sessões</strong> quinzenais (a cada 14 dias ao longo de {periodWeeks} semanas).
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Data *</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    {recurrenceType === 'single' ? 'Data da Sessão *' : 'Data de Início do Plano *'}
+                  </label>
                   <input 
                     type="date" 
                     required
@@ -491,7 +728,7 @@ export default function GestaoAgenda() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Valor da Sessão (R$)</label>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Valor por Sessão (R$)</label>
                   <input 
                     type="number"
                     value={formPrice}
@@ -515,7 +752,11 @@ export default function GestaoAgenda() {
                   disabled={isSubmitting}
                   className="w-full sm:w-auto px-8 py-3 sm:py-2.5 font-bold bg-primary text-white hover:bg-primary/90 rounded-xl shadow-md transition-colors disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Salvando...' : 'Salvar Agendamento'}
+                  {isSubmitting 
+                    ? 'Salvando...' 
+                    : recurrenceType === 'single' 
+                    ? 'Salvar Agendamento' 
+                    : 'Gerar Plano e Agendamentos'}
                 </button>
               </div>
             </form>
