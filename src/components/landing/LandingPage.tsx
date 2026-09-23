@@ -17,8 +17,18 @@ export default function LandingPage() {
           description="O corpo e o movimento em harmonia. Nossa sala é preparada para estimular a coordenação motora, o equilíbrio e a consciência corporal, essenciais para o desenvolvimento global."
           imageUrl="/images/Psicomoticidade.jpeg"
           zoomScale={2.2}
-          zoomOrigin="50% 0%"
+          zoomOrigin="50% -15%"
         />
+
+        <SpecialtyRoom 
+          title="Psicomotricidade (Vídeo)"
+          professionalName="Especialista em Ação"
+          description="Veja na prática como o corpo e o movimento em harmonia ajudam no desenvolvimento. Nossa sala é preparada para estimular a coordenação motora de forma lúdica."
+          videoUrl="/videos/psicomotricidade.mp4"
+          zoomScale={1.5}
+          zoomOrigin="50% 50%"
+        />
+
 
         <SpecialtyRoom 
           title="Fonoaudiologia"
