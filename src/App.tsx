@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import LandingPage from './components/landing/LandingPage';
 import Dashboard from './components/dashboard/Dashboard';
+import PatientDashboard from './components/patient/PatientDashboard';
 import { supabase } from './lib/supabase';
 
 export type UserRole = 'patient' | 'professional' | 'secretary' | 'admin' | null;
@@ -73,6 +74,9 @@ function App() {
   }
 
   if (userRole) {
+    if (userRole === 'patient') {
+      return <PatientDashboard onLogout={handleLogout} />;
+    }
     return <Dashboard role={userRole} onLogout={handleLogout} />;
   }
 

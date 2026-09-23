@@ -1,11 +1,24 @@
+import { useState } from 'react';
 import Header from './Header';
 import HeroSection from './HeroSection';
 import SpecialtyRoom from './SpecialtyRoom';
+import PatientLogin from '../patient/PatientLogin';
 
 export default function LandingPage() {
+  const [showPatientLogin, setShowPatientLogin] = useState(false);
+
+  if (showPatientLogin) {
+    return (
+      <PatientLogin 
+        onLoginSuccess={() => {}} // O App.tsx vai assumir o controle automaticamente por causa do onAuthStateChange
+        onBack={() => setShowPatientLogin(false)} 
+      />
+    );
+  }
+
   return (
     <main className="relative w-full bg-slate-50 min-h-screen">
-      <Header />
+      <Header onPatientClick={() => setShowPatientLogin(true)} />
       
             <HeroSection />
 

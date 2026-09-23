@@ -45,13 +45,39 @@ export default function PatientAgenda() {
   const handleCancel = async (id: string) => {
     if (justification.trim() === '') return;
     const target = appointments.find(a => a.id === id);
-    const reason = justification.trim();
+    if (!target) return;
 
-    setAppointments(prev => prev.map(s => s.id === id ? { ...s, status: 'cancelled', justification: reason } : s));
+    // Lógica 24h do lado do Paciente
+    const now = new Date();
+    const [year, month, day] = target.date.split('-').map(Number);
+    const [hours, minutes] = target.time.split(':').map(Number);
+    const aptDateTime = new Date(year, month - 1, day, hours, minutes);
+    
+    const diffMs = aptDateTime.getTime() - now.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    let statusNote = "";
+    if (diffHours < 24) {
+      statusNote = "[CANCELADO PELO PACIENTE < 24H: Faturado]";
+      const isPast = diffHours < 0;
+      const confirmCancel = window.confirm(
+        `Atenção: Você está cancelando esta sessão com menos de 24h de antecedência (${
+          isPast ? 'Sessão já ocorreu ou está no horário' : Math.floor(diffHours) + 'h restantes'
+        }).\n\nSegundo as políticas da clínica, essa sessão será considerada executada e faturada normalmente no seu plano.\n\nDeseja confirmar o cancelamento ciente desta regra?`
+      );
+      if (!confirmCancel) return;
+    } else {
+      statusNote = "[CANCELADO PELO PACIENTE > 24H: Reagendamento Permitido]";
+      alert(`Cancelamento dentro do prazo (mais de 24h).\n\nVocê tem direito a reagendar esta sessão sem custo adicional.`);
+    }
+
+    const finalReason = `${statusNote} ${justification.trim()}`;
+
+    setAppointments(prev => prev.map(s => s.id === id ? { ...s, status: 'cancelled', justification: finalReason } : s));
     setJustifyingId(null);
     setJustification('');
 
-    await updateAppointmentStatus(id, 'cancelled', reason, target?.patient_name || currentPatientName);
+    await updateAppointmentStatus(id, 'cancelled', finalReason, target.patient_name || currentPatientName);
     alert('Cancelamento registrado na clínica com justificativa salva na auditoria.');
   };
 
