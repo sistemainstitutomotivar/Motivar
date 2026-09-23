@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, 
   Clock, MapPin, ChevronLeft, ChevronRight, X, Activity, Play,
-  Repeat, CalendarRange, Sparkles, Trash2
+  Repeat, CalendarRange, Sparkles, Trash2, Copy
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { 
@@ -178,6 +178,24 @@ export default function GestaoAgenda() {
 
     // Persiste no banco e gera log
     await updateAppointmentStatus(apt.id, newStatus, justification, apt.patient_name);
+  };
+
+  const handleDuplicateAppointment = (apt: ClinicAppointment) => {
+    // Preenche os dados do modal com os dados da sessão existente
+    setFormPatient(apt.patient_name);
+    setFormTherapist(apt.therapist_name);
+    setFormRoom(apt.room);
+    setFormPrice(apt.price?.toString() || '180');
+    setFormDate(apt.date);
+    setFormTime(apt.time);
+    
+    // Reseta configs de recorrência para gerar algo novo
+    setRecurrenceType('single');
+    setAdditionalSlots([]);
+    setPeriodWeeks(12);
+
+    // Abre o modal
+    setIsModalOpen(true);
   };
 
   // Salvar Novo Agendamento (Avulso ou Lote Recorrente)
@@ -457,6 +475,16 @@ export default function GestaoAgenda() {
                         <XCircle size={18} />
                       </button>
                     )}
+                    
+                    <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                    
+                    <button 
+                      onClick={() => handleDuplicateAppointment(apt)}
+                      title="Copiar / Duplicar Consulta"
+                      className="p-1 rounded-lg text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Copy size={18} />
+                    </button>
                   </div>
 
                   {/* Renderiza a barra de progresso se estiver em andamento */}
