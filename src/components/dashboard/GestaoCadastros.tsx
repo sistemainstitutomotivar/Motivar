@@ -42,6 +42,15 @@ const initialUsers: MockUser[] = [
   { id: 'staff-1', name: 'Camila Albuquerque', role: 'collaborator', position: 'Secretária Geral & Recepção', email: 'secretaria@institutomotivar.com.br', contact: '(11) 94444-2222', status: 'active' },
 ];
 
+
+import { createClient } from '@supabase/supabase-js';
+
+const authSupabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } }
+);
+
 export default function GestaoCadastros() {
   const [activeTab, setActiveTab] = useState<'patient' | 'professional' | 'collaborator'>('patient');
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
@@ -228,6 +237,42 @@ export default function GestaoCadastros() {
     if (file) {
       setAvatarPreview(URL.createObjectURL(file));
       setAvatarFile(file);
+    }
+  };
+
+  
+  const handleGenerateAccess = async () => {
+    if (!formData.email) {
+       showAlert('Aviso', 'Preencha o e-mail do colaborador primeiro para poder gerar a senha.');
+       return;
+    }
+    
+    const tempPin = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
+    
+    try {
+      const { error } = await authSupabase.auth.signUp({
+        email: formData.email,
+        password: tempPin,
+        options: {
+          data: {
+            full_name: formData.name,
+            role: activeTab === 'professional' ? 'professional' : 'secretary'
+          }
+        }
+      });
+
+      if (error) {
+         if (error.message.includes('already registered')) {
+            showAlert('Aviso', 'Este usuário já possui acesso. Se ele esqueceu a senha, ele deve usar a opção "Esqueceu a senha" na tela de login.');
+         } else {
+            throw error;
+         }
+         return;
+      }
+
+      showAlert('Sucesso', `Acesso gerado com sucesso!\n\nE-mail: ${formData.email}\nSenha Temporária: ${tempPin}\n\nCopie essa senha e envie para o colaborador.`);
+    } catch(err: any) {
+       showAlert('Erro', 'Erro ao gerar acesso: ' + err.message);
     }
   };
 
@@ -825,13 +870,23 @@ export default function GestaoCadastros() {
 
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">E-mail de Acesso ao Sistema</label>
-                    <input 
-                      type="email" 
-                      value={formData.email || ''} 
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="secretaria@institutomotivar.com.br"
-                      className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
-                    />
+                    <div className="flex gap-2">
+                      <input 
+                        type="email" 
+                        value={formData.email || ''} 
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="secretaria@institutomotivar.com.br"
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                      />
+                      <button 
+                        type="button"
+                        onClick={handleGenerateAccess}
+                        className="px-4 py-3 bg-slate-800 text-white font-bold rounded-xl whitespace-nowrap hover:bg-slate-700 transition-colors"
+                      >
+                        Gerar Acesso
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">Gere uma senha temporária (PIN) para este colaborador acessar o sistema.</p>
                   </div>
                 </>
               )}
@@ -888,3 +943,4 @@ export default function GestaoCadastros() {
     </div>
   );
 }
+
