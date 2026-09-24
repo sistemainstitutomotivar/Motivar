@@ -87,7 +87,7 @@ export default function PatientLogin({ onLoginSuccess, onBack }: PatientLoginPro
       const { error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token: otp,
-        type: 'magiclink'
+        type: 'email'
       });
 
       if (verifyError) throw verifyError;
