@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import { LogOut, User, FileText, Bell, MessageCircle, ChevronRight, CreditCard } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import PatientAgenda from '../dashboard/PatientAgenda';
+import PatientProfileModal from './PatientProfileModal';
 
 interface PatientDashboardProps {
   onLogout: () => void;
@@ -9,6 +10,7 @@ interface PatientDashboardProps {
 
 export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
   const [userName, setUserName] = useState<string>('');
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -81,7 +83,7 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
           </div>
 
           <div className="space-y-6">
-            <button className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
+            <button onClick={() => setIsProfileOpen(true)} className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl group-hover:scale-110 transition-transform">
                   <User className="h-6 w-6" />
@@ -94,7 +96,7 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
               <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
             </button>
 
-            <button className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
+            <button onClick={() => setIsProfileOpen(true)} className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform">
                   <CreditCard className="h-6 w-6" />
@@ -107,7 +109,7 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
               <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
             </button>
 
-            <button className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
+            <button onClick={() => setIsProfileOpen(true)} className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform">
                   <FileText className="h-6 w-6" />
@@ -138,6 +140,7 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
           </div>
         </div>
       </div>
+      {isProfileOpen && <PatientProfileModal onClose={() => setIsProfileOpen(false)} />}
     </div>
   );
 }
