@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { LogOut, Calendar, User, FileText, Bell, MessageCircle, ChevronRight, Activity, CreditCard } from 'lucide-react';
+import { LogOut, Calendar, User, FileText, Bell, MessageCircle, ChevronRight, Activity, CreditCard, CheckCircle2, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface PatientDashboardProps {
@@ -17,7 +17,6 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // 1. Busca perfil para o nome
         const { data: profile } = await supabase
           .from('profiles')
           .select('full_name')
@@ -28,7 +27,6 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
           setUserName(profile.full_name.split(' ')[0]);
         }
 
-        // 2. Busca o ID do paciente na tabela clinic_patients pelo email
         if (user.email) {
           const { data: patientData } = await supabase
             .from('clinic_patients')
@@ -37,7 +35,6 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
             .single();
 
           if (patientData) {
-            // 3. Busca as consultas futuras deste paciente
             const today = new Date().toISOString().split('T')[0];
             const { data: appts } = await supabase
               .from('clinic_appointments')
@@ -63,6 +60,29 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
     fetchData();
   }, []);
 
+  const handleConfirmAppointment = async (id: string) => {
+    try {
+      const { error } = await supabase.from('clinic_appointments').update({ status: 'confirmed' }).eq('id', id);
+      if (!error) {
+        setAppointments(prev => prev.map(apt => apt.id === id ? { ...apt, status: 'confirmed' } : apt));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleCancelAppointment = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja cancelar esta sessão? A recepção será avisada.')) return;
+    try {
+      const { error } = await supabase.from('clinic_appointments').update({ status: 'cancelled' }).eq('id', id);
+      if (!error) {
+        setAppointments(prev => prev.map(apt => apt.id === id ? { ...apt, status: 'cancelled' } : apt));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const formatDateBR = (dateStr: string) => {
     if (!dateStr) return '';
     const [y, m, d] = dateStr.split('-');
@@ -76,27 +96,18 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
 
   return (
     <div className="min-h-screen bg-[#fff8f7] font-sans selection:bg-primary/20">
-      
-      {/* NAVBAR MODERNA */}
       <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-rose-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20">
             <div className="flex items-center">
-              <img 
-                src="/images/logo-motivar.png" 
-                alt="Instituto Motivar" 
-                className="h-10 w-auto"
-              />
+              <img src="/images/logo-motivar.png" alt="Instituto Motivar" className="h-10 w-auto" />
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
               <button className="p-2.5 rounded-full text-slate-400 hover:text-primary hover:bg-rose-50 transition-colors relative">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-white"></span>
               </button>
-              <button 
-                onClick={handleLogout}
-                className="flex items-center px-4 py-2 text-sm font-bold text-slate-500 hover:text-primary hover:bg-rose-50 rounded-full transition-colors"
-              >
+              <button onClick={handleLogout} className="flex items-center px-4 py-2 text-sm font-bold text-slate-500 hover:text-primary hover:bg-rose-50 rounded-full transition-colors">
                 <LogOut className="h-4 w-4 mr-2" /> 
                 <span className="hidden sm:inline">Sair</span>
               </button>
@@ -106,26 +117,21 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
-        
-        {/* HERO SECTION - BOAS VINDAS */}
         <div className="bg-gradient-to-r from-primary to-rose-400 rounded-3xl p-8 sm:p-12 text-white shadow-xl shadow-rose-200/50 relative overflow-hidden">
-          {/* Elementos decorativos de fundo */}
           <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
           <div className="absolute bottom-0 right-32 translate-y-12 w-40 h-40 bg-rose-600/20 rounded-full blur-2xl pointer-events-none"></div>
           
-          <div className="relative z-10">
-            <h1 className="text-3xl sm:text-4xl font-extrabold mb-2">
+          <div className="relative z-10 flex flex-col w-full">
+            <h1 className="text-3xl sm:text-4xl font-extrabold mb-2 text-white">
               Olá{userName ? `, ${userName}` : ''}! 👋
             </h1>
-            <p className="text-rose-100 text-lg max-w-xl">
+            <p className="text-rose-100 text-lg w-full max-w-[600px]">
               Que bom ter você por aqui. Acompanhe suas consultas, histórico e documentos de forma simples e rápida.
             </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* COLUNA PRINCIPAL - CONSULTAS */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white rounded-3xl shadow-sm border border-rose-100/50 overflow-hidden">
               <div className="px-8 py-6 border-b border-rose-50 flex items-center justify-between bg-white">
@@ -146,19 +152,52 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
                   {appointments.map((apt, idx) => (
                     <div key={idx} className="p-6 hover:bg-rose-50/30 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center text-primary font-bold text-lg border-2 border-white shadow-sm shrink-0">
-                          {formatDateBR(apt.date).substring(0, 2)}
-                        </div>
+                        {apt.therapist_avatar ? (
+                          <img src={apt.therapist_avatar} alt={apt.therapist_name} className="w-14 h-14 rounded-full object-cover border-2 border-rose-100 shadow-sm shrink-0" />
+                        ) : (
+                          <div className="w-14 h-14 bg-rose-100 rounded-full flex items-center justify-center text-primary font-bold text-lg border-2 border-white shadow-sm shrink-0">
+                            {formatDateBR(apt.date).substring(0, 2)}
+                          </div>
+                        )}
                         <div>
                           <p className="font-bold text-slate-800 text-lg">{apt.therapist_name}</p>
                           <p className="text-sm text-slate-500 font-medium">{apt.room || 'Consultório'} • {apt.modality || 'Sessão'}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 bg-white border border-rose-100 px-4 py-2.5 rounded-xl shadow-sm">
-                        <Calendar className="w-4 h-4 text-rose-400" />
-                        <span className="font-bold text-slate-700">
-                          {formatDateBR(apt.date)} às {apt.time}
-                        </span>
+                      <div className="flex flex-col items-end gap-3 mt-4 sm:mt-0">
+                        <div className="flex items-center gap-2 bg-white border border-rose-100 px-4 py-2.5 rounded-xl shadow-sm">
+                          <Calendar className="w-4 h-4 text-rose-400" />
+                          <span className="font-bold text-slate-700">
+                            {formatDateBR(apt.date)} às {apt.time}
+                          </span>
+                        </div>
+                        
+                        {(apt.status === 'pending' || !apt.status) && (
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => handleCancelAppointment(apt.id)}
+                              className="px-3 py-1.5 text-sm font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-1"
+                            >
+                              <XCircle className="w-4 h-4" /> Cancelar
+                            </button>
+                            <button 
+                              onClick={() => handleConfirmAppointment(apt.id)}
+                              className="px-4 py-1.5 text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-colors shadow-sm shadow-emerald-200 flex items-center gap-1"
+                            >
+                              <CheckCircle2 className="w-4 h-4" /> Confirmar
+                            </button>
+                          </div>
+                        )}
+                        {apt.status === 'confirmed' && (
+                          <div className="px-3 py-1 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-1">
+                            <CheckCircle2 className="w-4 h-4" /> Presença Confirmada
+                          </div>
+                        )}
+                        {apt.status === 'cancelled' && (
+                          <div className="px-3 py-1 text-sm font-bold text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center gap-1">
+                            <XCircle className="w-4 h-4" /> Cancelada
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -177,10 +216,7 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
             </div>
           </div>
 
-          {/* COLUNA LATERAL - ACESSOS RÁPIDOS */}
           <div className="space-y-6">
-            
-            {/* TILE: MEUS DADOS */}
             <button className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl group-hover:scale-110 transition-transform">
@@ -194,7 +230,6 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
               <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
             </button>
 
-            {/* TILE: FINANCEIRO */}
             <button className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:scale-110 transition-transform">
@@ -208,7 +243,6 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
               <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
             </button>
 
-            {/* TILE: DOCUMENTOS */}
             <button className="w-full bg-white p-6 rounded-3xl shadow-sm border border-rose-100/50 hover:shadow-md hover:border-rose-200 transition-all group flex items-center justify-between text-left">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:scale-110 transition-transform">
@@ -222,7 +256,6 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
               <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-primary transition-colors" />
             </button>
 
-            {/* WIDGET WHATSAPP */}
             <div className="bg-[#25D366]/10 rounded-3xl p-6 border border-[#25D366]/20 relative overflow-hidden mt-8">
               <div className="relative z-10">
                 <h3 className="text-lg font-bold text-[#1e9a49] mb-2 flex items-center gap-2">
@@ -238,7 +271,6 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
               </div>
               <MessageCircle className="absolute -bottom-4 -right-4 h-32 w-32 text-[#25D366]/10 pointer-events-none" />
             </div>
-
           </div>
         </div>
       </div>
