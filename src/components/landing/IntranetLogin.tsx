@@ -1,9 +1,6 @@
-import { showAlert } from '../../lib/customAlert';
 import { useState } from 'react';
-import { X, Lock, User, Loader2, Mail } from 'lucide-react';
-import type { UserRole } from '../../App';
+import { X, Lock, Loader2, Mail } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { formatCPF } from '../../lib/utils';
 
 interface IntranetLoginProps {
   onClose: () => void;
@@ -14,13 +11,7 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [role, setRole] = useState<UserRole>('patient');
 
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [cpf, setCpf] = useState(''); // Mantido apenas para cadastro
-
-  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -33,56 +24,20 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
     setLoading(true);
 
     try {
-      if (isRegistering) {
-        if (fullName.trim().length < 3) {
-          setError('Por favor, digite seu nome completo.');
-          setLoading(false);
-          return;
-        }
+      // Apenas fazer Login usando o E-MAIL nativamente
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
 
-        const cleanCpf = cpf.replace(/\D/g, '');
-        if (cleanCpf.length !== 11) {
-          setError('Por favor, digite um CPF válido com 11 números.');
-          setLoading(false);
-          return;
-        }
-
-        // 1. Cadastrar usuário na Autenticação
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: email,
-          password: password,
-          options: {
-            data: {
-              full_name: fullName,
-              cpf: cleanCpf,
-              role: role
-            }
-          }
-        });
-
-        if (signUpError) throw signUpError;
-        
-        showAlert('Aviso', "Conta criada com sucesso! Se você não for logado automaticamente, verifique as configurações de confirmação de e-mail no Supabase.");
-        onClose();
-
-      } else {
-        // Apenas fazer Login usando o E-MAIL nativamente
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: email,
-          password: password,
-        });
-
-        if (signInError) throw signInError;
-        
-        onClose();
-      }
+      if (signInError) throw signInError;
+      
+      onClose();
 
     } catch (err: any) {
       console.error("ERRO COMPLETO:", err);
       if (err.message === 'Invalid login credentials') {
         setError('E-mail ou senha incorretos.');
-      } else if (err.message === 'User already registered') {
-        setError('Este e-mail já está cadastrado.');
       } else if (err.message === 'Email not confirmed') {
         setError('Confirme seu e-mail antes de fazer login.');
       } else {
@@ -115,124 +70,58 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
             <Lock size={24} />
           </div>
           <h2 className="text-2xl font-bold text-slate-800 w-full" style={{ wordBreak: 'normal' }}>
-            {isRegistering ? 'Criar Nova Conta' : role === 'patient' ? 'Área do Paciente' : role === 'professional' ? 'Área do Terapeuta' : 'Administração'}
+            Acesso Restrito
           </h2>
           <p className="text-slate-500 text-sm mt-2" style={{ whiteSpace: 'normal', wordBreak: 'normal' }}>
-            {isRegistering 
-              ? 'Preencha os dados abaixo para se cadastrar.' 
-              : role === 'patient' ? 'Acompanhe as evoluções e agendamentos.' : role === 'professional' ? 'Acesso restrito para terapeutas da clínica.' : 'Gestão administrativa e financeira.'}
+            Área exclusiva para colaboradores e gestão da clínica.
           </p>
         </div>
 
-        {/* Abas de Seleção de Perfil */}
-        <div className="flex p-1 bg-slate-100 rounded-xl mb-6 relative gap-1">
-          <button 
-            type="button"
-            onClick={() => setRole('patient')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all z-10 ${role === 'patient' ? 'text-primary shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Paciente
-          </button>
-          <button 
-            type="button"
-            onClick={() => setRole('professional')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all z-10 ${role === 'professional' ? 'text-primary shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Terapeuta
-          </button>
-          <button 
-            type="button"
-            onClick={() => setRole('admin')}
-            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all z-10 ${role === 'admin' ? 'text-primary shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            Gestão
-          </button>
-        </div>
-
-        <form className="space-y-4 w-full flex flex-col" onSubmit={handleSubmit}>
-          
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {error && (
-            <div className="bg-red-50 text-red-500 text-sm p-3 rounded-lg text-center font-medium border border-red-100">
+            <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl text-center font-medium w-full">
               {error}
             </div>
           )}
 
-          {isRegistering && (
-            <>
-              <div className="w-full">
-                <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>Nome Completo</label>
-                <div className="relative w-full flex items-center">
-                  <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
-                    <User size={18} />
-                  </div>
-                  <input 
-                    type="text" 
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Seu nome"
-                    className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
-                    style={{ width: '100%' }}
-                  />
+          <div className="flex flex-col gap-4">
+            <div className="w-full">
+              <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>E-mail</label>
+              <div className="relative w-full flex items-center">
+                <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
+                  <Mail size={18} />
                 </div>
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
+                  style={{ width: '100%' }}
+                />
               </div>
+            </div>
 
-              <div className="w-full">
-                <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>CPF</label>
-                <div className="relative w-full flex items-center">
-                  <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
-                    <User size={18} />
-                  </div>
-                  <input 
-                    type="text" 
-                    value={cpf}
-                    onChange={(e) => setCpf(formatCPF(e.target.value))}
-                    placeholder="000.000.000-00"
-                    maxLength={14}
-                    className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
-                    style={{ width: '100%' }}
-                  />
+            <div className="w-full">
+              <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>Senha</label>
+              <div className="relative w-full flex items-center">
+                <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
+                  <Lock size={18} />
                 </div>
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
+                  style={{ width: '100%' }}
+                />
               </div>
-            </>
-          )}
+            </div>
 
-          <div className="w-full">
-            <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>E-mail</label>
-            <div className="relative w-full flex items-center">
-              <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
-                <Mail size={18} />
-              </div>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
-                className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
-                style={{ width: '100%' }}
-              />
+            <div className="flex justify-end mt-2">
+              <a href="#" className="text-xs font-medium text-primary hover:text-primary/80">Esqueceu a senha?</a>
             </div>
-          </div>
-          
-          <div className="w-full">
-            <label className="block text-sm font-medium text-slate-700 mb-1" style={{ textAlign: 'left' }}>Senha</label>
-            <div className="relative w-full flex items-center">
-              <div className="absolute left-3 text-slate-400 flex items-center justify-center h-full">
-                <Lock size={18} />
-              </div>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"
-                style={{ width: '100%' }}
-              />
-            </div>
-            {!isRegistering && (
-              <div className="flex justify-end mt-2">
-                <a href="#" className="text-xs font-medium text-primary hover:text-primary/80">Esqueceu a senha?</a>
-              </div>
-            )}
           </div>
 
           <button 
@@ -242,18 +131,8 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
             style={{ width: '100%' }}
           >
             {loading && <Loader2 className="animate-spin" size={20} />}
-            {loading ? 'Processando...' : isRegistering ? 'Criar Conta' : 'Acessar Sistema'}
+            {loading ? 'Autenticando...' : 'Acessar Sistema'}
           </button>
-
-          <div className="text-center mt-4">
-            <button 
-              type="button" 
-              onClick={() => setIsRegistering(!isRegistering)}
-              className="text-sm text-slate-500 hover:text-primary font-medium transition-colors"
-            >
-              {isRegistering ? 'Já tem uma conta? Fazer Login' : 'Ainda não tem conta? Cadastre-se'}
-            </button>
-          </div>
         </form>
       </div>
     </div>
