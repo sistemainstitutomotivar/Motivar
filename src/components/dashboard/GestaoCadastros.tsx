@@ -256,7 +256,8 @@ export default function GestaoCadastros() {
         options: {
           data: {
             full_name: formData.name,
-            role: activeTab === 'professional' ? 'professional' : 'secretary'
+            role: activeTab === 'professional' ? 'professional' : 'secretary',
+            force_password_change: true
           }
         }
       });

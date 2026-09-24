@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import LandingPage from './components/landing/LandingPage';
 import Dashboard from './components/dashboard/Dashboard';
+import ForcePasswordChange from './components/auth/ForcePasswordChange';
 import PatientDashboard from './components/patient/PatientDashboard';
 import { supabase } from './lib/supabase';
 
@@ -9,6 +10,7 @@ export type UserRole = 'patient' | 'professional' | 'secretary' | 'admin' | null
 function App() {
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
 
   useEffect(() => {
     // Busca a sessão atual assim que o app carrega
@@ -40,7 +42,7 @@ function App() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, force_password_change')
         .eq('id', userId)
         .single();
         
@@ -50,6 +52,9 @@ function App() {
         
       if (data && data.role) {
         setUserRole(data.role as UserRole);
+        if (data.force_password_change) {
+          setForcePasswordChange(true);
+        }
       } else {
         throw new Error('Perfil não encontrado na tabela profiles');
       }
@@ -74,6 +79,9 @@ function App() {
   }
 
   if (userRole) {
+    if (forcePasswordChange) {
+      return <ForcePasswordChange onPasswordChanged={() => setForcePasswordChange(false)} />;
+    }
     if (userRole === 'patient') {
       return <PatientDashboard onLogout={handleLogout} />;
     }
