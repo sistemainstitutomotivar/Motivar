@@ -18,14 +18,14 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', user.id)
+        const { data: patient } = await supabase
+          .from('clinic_patients')
+          .select('name')
+          .eq('email', user.email)
           .single();
           
-        if (profile?.full_name) {
-          setUserName(profile.full_name.split(' ')[0]);
+        if (patient?.name) {
+          setUserName(patient.name);
         }
       } catch (error) {
         console.error('Erro ao buscar dados do paciente:', error);
@@ -69,7 +69,7 @@ export default function PatientDashboard({ onLogout }: PatientDashboardProps) {
           
           <div className="relative z-10 flex flex-col w-full">
             <h1 className="text-3xl sm:text-4xl font-extrabold mb-2 text-white">
-              Olá{userName ? `, ${userName}` : ''}! 👋
+              Olá{userName ? ` ${userName}` : ''}! 👋
             </h1>
             <p className="text-rose-100 text-lg w-full max-w-[600px]">
               Que bom ter você por aqui. Acompanhe suas consultas, histórico e documentos de forma simples e rápida.
