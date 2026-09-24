@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import LandingPage from './components/landing/LandingPage';
 import Dashboard from './components/dashboard/Dashboard';
 import ForcePasswordChange from './components/auth/ForcePasswordChange';
+import WelcomeModal from './components/auth/WelcomeModal';
 import PatientDashboard from './components/patient/PatientDashboard';
 import { supabase } from './lib/supabase';
 
@@ -10,9 +11,20 @@ export type UserRole = 'patient' | 'professional' | 'secretary' | 'admin' | null
 function App() {
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [forcePasswordChange, setForcePasswordChange] = useState(false);
 
   useEffect(() => {
+    // Intercepta a URL antes do Supabase limpar o hash para sabermos se veio de um e-mail
+    if (window.location.hash.includes('type=signup') || 
+        window.location.hash.includes('type=invite') || 
+        window.location.hash.includes('type=magiclink') ||
+        window.location.hash.includes('type=recovery')) {
+      setShowWelcome(true);
+      // Removemos o hash só visualmente para limpar a URL, o supabase já pegou os tokens
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+
     // Busca a sessão atual assim que o app carrega
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -79,6 +91,9 @@ function App() {
   }
 
   if (userRole) {
+    if (showWelcome) {
+      return <WelcomeModal onClose={() => setShowWelcome(false)} />;
+    }
     if (forcePasswordChange) {
       return <ForcePasswordChange onPasswordChanged={() => setForcePasswordChange(false)} />;
     }
