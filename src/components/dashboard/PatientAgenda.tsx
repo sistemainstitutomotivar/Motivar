@@ -1,20 +1,18 @@
+import { supabase } from '../../lib/supabase';
 import { formatDateBR } from '../../lib/utils';
 import { showAlert, showConfirm } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { X, Calendar, Clock, MapPin, Info, CheckCircle, XCircle } from 'lucide-react';
-import { getAppointments, updateAppointmentStatus } from '../../lib/appointments';
-import type { ClinicAppointment } from '../../lib/appointments';
+import { updateAppointmentStatus } from '../../lib/appointments';
 
 export default function PatientAgenda() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [justifyingId, setJustifyingId] = useState<string | null>(null);
   const [justification, setJustification] = useState('');
   
-  const [appointments, setAppointments] = useState<ClinicAppointment[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Nome do paciente logado (Lucas Matheus Silva para simulação)
-  const currentPatientName = 'Lucas Matheus Silva';
+  const [currentPatientName, setCurrentPatientName] = useState('Paciente');
 
   useEffect(() => {
     loadPatientAppointments();
@@ -23,13 +21,34 @@ export default function PatientAgenda() {
   const loadPatientAppointments = async () => {
     setLoading(true);
     try {
-      const allApts = await getAppointments();
-      // Filtra os agendamentos da Agenda Geral vinculados a este paciente
-      const myApts = allApts.filter(a => 
-        a.patient_name.toLowerCase().includes('lucas') ||
-        a.patient_name === currentPatientName
-      );
-      setAppointments(myApts.length > 0 ? myApts : allApts.slice(0, 2));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) return;
+
+      // 1. Busca paciente
+      const { data: patientData } = await supabase
+        .from('clinic_patients')
+        .select('id, name')
+        .eq('email', user.email)
+        .single();
+
+      if (patientData) {
+        setCurrentPatientName(patientData.name);
+        
+        // 2. Busca consultas futuras
+        const today = new Date().toISOString().split('T')[0];
+        const { data: appts } = await supabase
+          .from('clinic_appointments')
+          .select('*')
+          .eq('patient_id', patientData.id)
+          .gte('date', today)
+          .order('date', { ascending: true })
+          .order('time', { ascending: true })
+          .limit(10);
+          
+        if (appts) {
+          setAppointments(appts);
+        }
+      }
     } catch (err) {
       console.warn('Erro ao carregar agenda do paciente:', err);
     } finally {
@@ -95,7 +114,7 @@ export default function PatientAgenda() {
       {loading ? (
         <div className="p-8 text-center text-slate-500">Carregando seus agendamentos...</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 items-start">
           {appointments.map(session => {
             const isExpanded = expandedId === session.id;
             const isJustifying = justifyingId === session.id;
