@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, 
   Clock, MapPin, ChevronLeft, ChevronRight, X, Activity, Play,
-  Repeat, CalendarRange, Trash2, Copy, Edit2
+  Repeat, CalendarRange, Sparkles, Trash2, Copy, Edit2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { 
   getAppointments, 
-    createBatchAppointments, 
-    updateAppointmentStatus,
+  createAppointment, 
+  createBatchAppointments, 
+  generateOccurrences, 
+  updateAppointmentStatus,
   updateAppointment
 } from '../../lib/appointments';
-import type { ClinicAppointment } from '../../lib/appointments';
+import type { ClinicAppointment, RecurringSlot } from '../../lib/appointments';
 
 const today = new Date();
 const formatYMD = (d: Date) => d.toISOString().split('T')[0];
@@ -77,15 +79,16 @@ export default function GestaoAgenda() {
   const [recurrenceFilter, setRecurrenceFilter] = useState<'all' | 'single' | 'weekly' | 'biweekly'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Formulário de Planejamento Mensal
+  // Formulário de Novo Agendamento
   const [formPatient, setFormPatient] = useState('');
-  const [referenceMonth, setReferenceMonth] = useState(formatYMD(today).slice(0, 7)); // "YYYY-MM"
-  const [weeklyTherapies, setWeeklyTherapies] = useState([{ id: crypto.randomUUID(), dayOfWeek: 1, time: '09:00', therapist: '', room: 'Sala 01 - Principal' }]);
-  const [replicateNextMonth, setReplicateNextMonth] = useState(true);
+  const [formTherapist, setFormTherapist] = useState('');
+  const [formDate, setFormDate] = useState(formatYMD(today));
+  const [formTime, setFormTime] = useState('09:00');
+  const [formRoom, setFormRoom] = useState('Sala 01 - Principal');
+  const [formPrice, setFormPrice] = useState('180');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingAppointmentId, setEditingAppointmentId] = useState<string | null>(null);
-  const [formDate, setFormDate] = useState(formatYMD(today)); // Apenas para edição
-
+  
   // Cancelamento
   const [cancelModalData, setCancelModalData] = useState<{
     isOpen: boolean;
@@ -104,6 +107,11 @@ export default function GestaoAgenda() {
     requestedBy: '',
     reason: ''
   });
+
+  // Recorrência (Plano Semanal Fixo / Quinzenal / Avulsa)
+  const [recurrenceType, setRecurrenceType] = useState<'single' | 'weekly' | 'biweekly'>('single');
+  const [periodWeeks, setPeriodWeeks] = useState<number>(12); // Padrão: 12 semanas (3 meses)
+  const [additionalSlots, setAdditionalSlots] = useState<RecurringSlot[]>([]);
 
   useEffect(() => {
     loadData();
@@ -255,133 +263,106 @@ export default function GestaoAgenda() {
   const handleEditAppointment = (apt: ClinicAppointment) => {
     setEditingAppointmentId(apt.id);
     setFormPatient(apt.patient_name);
+    setFormTherapist(apt.therapist_name);
+    setFormRoom(apt.room);
+    setFormPrice(apt.price?.toString() || '180');
     setFormDate(apt.date);
-    const d = new Date(apt.date + 'T12:00:00');
-    setWeeklyTherapies([{
-      id: crypto.randomUUID(),
-      dayOfWeek: d.getDay(),
-      time: apt.time,
-      therapist: apt.therapist_name,
-      room: apt.room
-    }]);
+    setFormTime(apt.time);
+    
+    // Forçamos single mode para a edição (edição de ocorrência única)
+    setRecurrenceType('single');
     setIsModalOpen(true);
   };
 
   const handleDuplicateAppointment = (apt: ClinicAppointment) => {
     setEditingAppointmentId(null);
     setFormPatient(apt.patient_name);
-    setReferenceMonth(formatYMD(today).slice(0, 7));
-    const d = new Date(apt.date + 'T12:00:00');
-    setWeeklyTherapies([{
-      id: crypto.randomUUID(),
-      dayOfWeek: d.getDay(),
-      time: apt.time,
-      therapist: apt.therapist_name,
-      room: apt.room
-    }]);
-    setReplicateNextMonth(false);
+    setFormTherapist(apt.therapist_name);
+    setFormRoom(apt.room);
+    setFormPrice(apt.price?.toString() || '180');
+    setFormDate(apt.date);
+    setFormTime(apt.time);
+    setRecurrenceType('single');
+    setAdditionalSlots([]);
+    setPeriodWeeks(12);
     setIsModalOpen(true);
   };
 
-
-  // Salvar Novo Agendamento (Planejamento Mensal)
+  // Salvar Novo Agendamento (Avulso, Lote ou Edição)
   const handleSaveAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formPatient) {
-      alert('Por favor, selecione o paciente.');
-      return;
-    }
-
-    const invalidTherapy = weeklyTherapies.find(t => !t.therapist || !t.time);
-    if (invalidTherapy) {
-      alert('Preencha horário e terapeuta para todas as terapias na grade.');
+    if (!formPatient || !formTherapist || !formDate || !formTime) {
+      alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
 
     setIsSubmitting(true);
     try {
       const selectedPatientObj = patientsList.find(p => p.name === formPatient);
+      const selectedTherapistObj = therapistsList.find(t => t.name === formTherapist);
+
+      const baseAppointmentData = {
+        date: formDate,
+        time: formTime,
+        duration_minutes: 50,
+        patient_id: selectedPatientObj?.id,
+        patient_name: formPatient,
+        patient_avatar: selectedPatientObj?.avatar_url,
+        therapist_id: selectedTherapistObj?.id,
+        therapist_name: formTherapist,
+        therapist_avatar: selectedTherapistObj?.avatar_url,
+        room: formRoom,
+        price: parseFloat(formPrice) || 180,
+      };
 
       if (editingAppointmentId) {
-        // Modo Edição de 1 sessão
-        const t = weeklyTherapies[0];
-        const selectedTherapistObj = therapistsList.find(th => th.name === t.therapist);
-        const baseAppointmentData = {
-          date: formDate,
-          time: t.time,
-          duration_minutes: 50,
-          patient_id: selectedPatientObj?.id,
-          patient_name: formPatient,
-          patient_avatar: selectedPatientObj?.avatar_url,
-          therapist_id: selectedTherapistObj?.id,
-          therapist_name: t.therapist,
-          therapist_avatar: selectedTherapistObj?.avatar_url,
-          room: t.room,
-        };
+        // Modo Edição
         await updateAppointment(editingAppointmentId, baseAppointmentData);
         setAppointments(prev => prev.map(a => 
           a.id === editingAppointmentId ? { ...a, ...baseAppointmentData } : a
         ));
         alert('Agendamento atualizado com sucesso!');
       } else {
-        // Modo Criação Mensal
-        const groupId = crypto.randomUUID();
-        const occurrences: any[] = [];
-        
-        const [year, month] = referenceMonth.split('-').map(Number);
-        const monthsToGenerate = replicateNextMonth ? [month, month === 12 ? 1 : month + 1] : [month];
-        const yearsToGenerate = replicateNextMonth ? [year, month === 12 ? year + 1 : year] : [year];
+        // Modo Criação
+        const createPayload = {
+          ...baseAppointmentData,
+          status: 'confirmed' as const,
+          payment_status: 'pending' as const,
+        };
 
-        monthsToGenerate.forEach((m, idx) => {
-          const y = yearsToGenerate[idx];
-          const daysInMonth = new Date(y, m, 0).getDate();
-          
-          for (let day = 1; day <= daysInMonth; day++) {
-            const dateObj = new Date(y, m - 1, day, 12, 0, 0);
-            const dayOfWeek = dateObj.getDay();
-            
-            const matchedTherapies = weeklyTherapies.filter(t => t.dayOfWeek === dayOfWeek);
-            
-            matchedTherapies.forEach(t => {
-              const selectedTherapistObj = therapistsList.find(th => th.name === t.therapist);
-              occurrences.push({
-                date: dateObj.toISOString().split('T')[0],
-                time: t.time,
-                duration_minutes: 50,
-                patient_id: selectedPatientObj?.id,
-                patient_name: formPatient,
-                patient_avatar: selectedPatientObj?.avatar_url,
-                therapist_id: selectedTherapistObj?.id,
-                therapist_name: t.therapist,
-                therapist_avatar: selectedTherapistObj?.avatar_url,
-                room: t.room,
-                status: 'confirmed',
-                payment_status: 'pending',
-                recurrence_type: 'weekly',
-                recurrence_group_id: groupId,
-              });
-            });
-          }
-        });
-
-        if (occurrences.length === 0) {
-          alert('Nenhum dia correspondente encontrado no mês selecionado.');
-          setIsSubmitting(false);
-          return;
+        if (recurrenceType === 'single') {
+          const created = await createAppointment({
+            ...createPayload,
+            recurrence_type: 'single'
+          });
+          setAppointments(prev => [created, ...prev]);
+          alert('Agendamento avulso realizado e registrado na trilha de auditoria com sucesso!');
+        } else {
+          const occurrences = generateOccurrences(
+            createPayload,
+            recurrenceType,
+            periodWeeks,
+            additionalSlots
+          );
+          const createdBatch = await createBatchAppointments(occurrences);
+          setAppointments(prev => [...createdBatch, ...prev]);
+          const modalityLabel = recurrenceType === 'weekly' ? 'Semanal Fixo' : 'Quinzenal';
+          alert(`Plano ${modalityLabel} criado com sucesso! ${createdBatch.length} sessões agendadas e registradas na auditoria.`);
         }
-
-        const createdBatch = await createBatchAppointments(occurrences);
-        setAppointments(prev => [...createdBatch, ...prev]);
-        alert(`Planejamento mensal gerado com sucesso! ${createdBatch.length} sessões agendadas.`);
       }
 
       setIsModalOpen(false);
+
+      // Reseta formulário
       setFormPatient('');
-      setWeeklyTherapies([{ id: crypto.randomUUID(), dayOfWeek: 1, time: '09:00', therapist: '', room: 'Sala 01 - Principal' }]);
+      setFormTherapist('');
+      setRecurrenceType('single');
+      setAdditionalSlots([]);
+      setPeriodWeeks(12);
       setEditingAppointmentId(null);
     } catch (err) {
       console.error(err);
-      alert('Ocorreu um erro ao salvar o planejamento.');
+      alert('Ocorreu um erro ao salvar o agendamento.');
     } finally {
       setIsSubmitting(false);
     }
@@ -644,10 +625,10 @@ export default function GestaoAgenda() {
         </div>
       </div>
 
-      {/* NOVO AGENDAMENTO MODAL (PLANEJAMENTO MENSAL) */}
+      {/* NOVO AGENDAMENTO MODAL (DINÂMICO E AUDITADO) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-[600px] shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-[500px] shadow-2xl relative max-h-[90vh] overflow-y-auto flex flex-col">
             <button 
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full z-10"
@@ -656,164 +637,264 @@ export default function GestaoAgenda() {
             </button>
             
             <h3 className="font-display-sm text-xl sm:text-2xl font-bold text-slate-800 mb-6 pr-8">
-              {editingAppointmentId ? 'Editar Agendamento' : 'Novo Planejamento Mensal'}
+              {editingAppointmentId ? 'Editar Agendamento' : 'Novo Agendamento'}
             </h3>
             
-            <form className="space-y-6" onSubmit={handleSaveAppointment}>
-              {/* Informações Gerais */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">Paciente *</label>
-                  <select 
-                    required
-                    value={formPatient}
-                    onChange={(e) => setFormPatient(e.target.value)}
-                    className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
-                  >
-                    <option value="">Selecione o paciente cadastrado...</option>
-                    {patientsList.map(p => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-                {!editingAppointmentId && (
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Mês/Ano de Referência *</label>
-                    <input 
-                      type="month" 
-                      required
-                      value={referenceMonth}
-                      onChange={(e) => setReferenceMonth(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" 
-                    />
-                  </div>
-                )}
-                {editingAppointmentId && (
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">Data da Sessão *</label>
-                    <input 
-                      type="date" 
-                      required
-                      value={formDate}
-                      onChange={(e) => setFormDate(e.target.value)}
-                      className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" 
-                    />
-                  </div>
-                )}
+            <form className="space-y-4" onSubmit={handleSaveAppointment}>
+              {/* Paciente do Banco */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Paciente *</label>
+                <select 
+                  required
+                  value={formPatient}
+                  onChange={(e) => setFormPatient(e.target.value)}
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                >
+                  <option value="">Selecione o paciente cadastrado...</option>
+                  {patientsList.map(p => (
+                    <option key={p.id} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-400 mt-1">Carregado automaticamente da Gestão de Cadastros.</p>
               </div>
 
-              <hr className="border-slate-100" />
-
-              {/* Grade Semanal */}
+              {/* Terapeuta do Banco */}
               <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold text-slate-800">Grade Semanal do Paciente</h3>
-                  {!editingAppointmentId && (
-                    <p className="text-xs text-slate-500">Defina os dias fixos na semana</p>
-                  )}
-                </div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Terapeuta *</label>
+                <select 
+                  required
+                  value={formTherapist}
+                  onChange={(e) => setFormTherapist(e.target.value)}
+                  className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                >
+                  <option value="">Selecione o(a) terapeuta...</option>
+                  {therapistsList
+                    .filter(t => {
+                      if (!formPatient) return true; // Se nenhum paciente selecionado, mostra todos
+                      const patient = patientsList.find(p => p.name === formPatient);
+                      // Se o paciente tiver terapias cadastradas, filtra
+                      if (patient && patient.therapies && patient.therapies.length > 0) {
+                        return t.specialty && patient.therapies.includes(t.specialty);
+                      }
+                      return true; // Se não houver terapias cadastradas, mostra todos
+                    })
+                    .map(t => (
+                    <option key={t.id} value={t.name}>
+                      {t.name} {t.specialty ? `(${t.specialty})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                {weeklyTherapies.map((therapy) => (
-                  <div key={therapy.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 relative">
-                    {!editingAppointmentId && weeklyTherapies.length > 1 && (
-                      <div 
-                        className="absolute top-4 right-4 text-red-500 cursor-pointer hover:bg-red-500/10 p-1 rounded"
-                        onClick={() => setWeeklyTherapies(prev => prev.filter(t => t.id !== therapy.id))}
-                        title="Remover Terapia"
-                      >
-                        <Trash2 size={16} />
+              {/* Modalidade / Frequência da Terapia */}
+              {!editingAppointmentId && (
+                <>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Frequência / Tipo de Agenda *</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRecurrenceType('single')}
+                    className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                      recurrenceType === 'single'
+                        ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <Clock size={15} />
+                      <span>Sessão Avulsa</span>
+                    </div>
+                    <span className="text-[11px] font-normal text-slate-500">Consulta única ou avaliação</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRecurrenceType('weekly')}
+                    className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                      recurrenceType === 'weekly'
+                        ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <Repeat size={15} />
+                      <span>Terapia Semanal</span>
+                    </div>
+                    <span className="text-[11px] font-normal text-slate-500">Dias e horários fixos</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setRecurrenceType('biweekly')}
+                    className={`p-3 rounded-xl border text-left flex flex-col gap-1 transition-all ${
+                      recurrenceType === 'biweekly'
+                        ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/20 font-bold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600 bg-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <CalendarRange size={15} />
+                      <span>Terapia Quinzenal</span>
+                    </div>
+                    <span className="text-[11px] font-normal text-slate-500">A cada 15 dias</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Configurações extras de Plano Recorrente */}
+              {recurrenceType !== 'single' && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700">Duração do Contrato / Plano</label>
+                      <p className="text-[11px] text-slate-500">Período de semanas a serem pré-agendadas</p>
+                    </div>
+                    <select
+                      value={periodWeeks}
+                      onChange={(e) => setPeriodWeeks(Number(e.target.value))}
+                      className="p-2 text-xs font-bold bg-white border border-slate-300 rounded-lg text-slate-700 outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value={4}>4 semanas (1 mês)</option>
+                      <option value={8}>8 semanas (2 meses)</option>
+                      <option value={12}>12 semanas (3 meses - Trimestre)</option>
+                      <option value={24}>24 semanas (6 meses - Semestre)</option>
+                    </select>
+                  </div>
+
+                  {/* Dias adicionais na semana (ex: Segunda 14h, Quarta 15h, Sexta 17h) */}
+                  {recurrenceType === 'weekly' && (
+                    <div className="pt-2 border-t border-slate-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-700">Grade Semanal do Paciente:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdditionalSlots(prev => [...prev, { dayOfWeek: 3, time: '14:00', room: formRoom }]);
+                          }}
+                          className="text-xs text-primary hover:text-primary/80 font-bold flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-primary/30 shadow-sm"
+                        >
+                          <Plus size={13} />
+                          Adicionar outro dia fixo
+                        </button>
                       </div>
-                    )}
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-1">
-                      {!editingAppointmentId && (
+
+                      <div className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200 mb-2 flex items-center justify-between">
                         <div>
-                          <label className="block text-xs font-bold mb-1 text-slate-500">Dia da Semana *</label>
-                          <select 
-                            value={therapy.dayOfWeek}
-                            onChange={(e) => setWeeklyTherapies(prev => prev.map(t => t.id === therapy.id ? { ...t, dayOfWeek: Number(e.target.value) } : t))}
-                            className="w-full border border-slate-200 rounded-md p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-primary"
+                          <span className="font-bold text-primary">1º Horário:</span>{' '}
+                          {formDate ? new Date(`${formDate}T12:00:00`).toLocaleDateString('pt-BR', { weekday: 'long' }) : 'Dia inicial'} às {formTime}
+                        </div>
+                        <span className="text-[10px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">Principal</span>
+                      </div>
+
+                      {additionalSlots.map((slot, idx) => (
+                        <div key={idx} className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-white p-2.5 rounded-xl border border-slate-200 mb-2">
+                          <span className="text-xs font-bold text-slate-500">{idx + 2}º Horário:</span>
+                          <select
+                            value={slot.dayOfWeek}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              setAdditionalSlots(prev => prev.map((s, i) => i === idx ? { ...s, dayOfWeek: val } : s));
+                            }}
+                            className="text-xs p-1.5 border border-slate-300 rounded-lg bg-slate-50 font-medium text-slate-700"
                           >
                             {DAYS_OF_WEEK.map(d => (
                               <option key={d.value} value={d.value}>{d.label}</option>
                             ))}
                           </select>
+                          <input
+                            type="time"
+                            value={slot.time}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAdditionalSlots(prev => prev.map((s, i) => i === idx ? { ...s, time: val } : s));
+                            }}
+                            className="text-xs p-1.5 border border-slate-300 rounded-lg bg-slate-50 text-slate-700"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setAdditionalSlots(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 ml-auto"
+                            title="Remover este dia"
+                          >
+                            <Trash2 size={15} />
+                          </button>
                         </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Resumo Dinâmico do Lote */}
+                  <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 flex items-start gap-2.5">
+                    <Sparkles size={16} className="text-primary mt-0.5 shrink-0" />
+                    <div className="text-xs text-primary leading-relaxed">
+                      <strong>Resumo do Plano:</strong>{' '}
+                      {recurrenceType === 'weekly' ? (
+                        <span>
+                          Serão geradas <strong>{(1 + additionalSlots.length) * periodWeeks} sessões</strong> fixas ({1 + additionalSlots.length}x na semana por {periodWeeks} semanas) diretamente na Agenda Geral.
+                        </span>
+                      ) : (
+                        <span>
+                          Serão geradas <strong>{Math.max(1, Math.floor(periodWeeks / 2))} sessões</strong> quinzenais (a cada 14 dias ao longo de {periodWeeks} semanas).
+                        </span>
                       )}
-                      <div>
-                        <label className="block text-xs font-bold mb-1 text-slate-500">Horário *</label>
-                        <input 
-                          type="time" 
-                          required
-                          value={therapy.time}
-                          onChange={(e) => setWeeklyTherapies(prev => prev.map(t => t.id === therapy.id ? { ...t, time: e.target.value } : t))}
-                          className="w-full border border-slate-200 rounded-md p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold mb-1 text-slate-500">Terapeuta *</label>
-                        <select 
-                          required
-                          value={therapy.therapist}
-                          onChange={(e) => setWeeklyTherapies(prev => prev.map(t => t.id === therapy.id ? { ...t, therapist: e.target.value } : t))}
-                          className="w-full border border-slate-200 rounded-md p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-primary"
-                        >
-                          <option value="">Selecione...</option>
-                          {therapistsList.map(t => (
-                            <option key={t.id} value={t.name}>
-                              {t.name} {t.specialty ? `(${t.specialty})` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold mb-1 text-slate-500">Local (Sala)</label>
-                        <select 
-                          value={therapy.room}
-                          onChange={(e) => setWeeklyTherapies(prev => prev.map(t => t.id === therapy.id ? { ...t, room: e.target.value } : t))}
-                          className="w-full border border-slate-200 rounded-md p-2 text-sm bg-white outline-none focus:ring-2 focus:ring-primary"
-                        >
-                          <option>Sala 01 - Principal</option>
-                          <option>Sala 02 - Integração Sensorial</option>
-                          <option>Sala 03</option>
-                          <option>Sala 04</option>
-                        </select>
-                      </div>
                     </div>
                   </div>
-                ))}
+                </div>
+              )}
+              </>
+            )}
 
-                {!editingAppointmentId && (
-                  <button 
-                    type="button"
-                    onClick={() => setWeeklyTherapies(prev => [...prev, { id: crypto.randomUUID(), dayOfWeek: 1, time: '10:00', therapist: '', room: 'Sala 01 - Principal' }])}
-                    className="w-full py-3 border-2 border-dashed border-primary text-primary font-bold rounded-xl hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Plus size={18} />
-                    Adicionar Nova Terapia na Semana
-                  </button>
-                )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    {recurrenceType === 'single' ? 'Data da Sessão *' : 'Data de Início do Plano *'}
+                  </label>
+                  <input 
+                    type="date" 
+                    required
+                    value={formDate}
+                    onChange={(e) => setFormDate(e.target.value)}
+                    className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Horário *</label>
+                  <input 
+                    type="time" 
+                    required
+                    value={formTime}
+                    onChange={(e) => setFormTime(e.target.value)}
+                    className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600" 
+                  />
+                </div>
               </div>
 
-              {!editingAppointmentId && (
-                <>
-                  <hr className="border-slate-100" />
-                  <div className="bg-primary/5 border border-primary/20 rounded-xl p-4">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={replicateNextMonth}
-                        onChange={(e) => setReplicateNextMonth(e.target.checked)}
-                        className="mt-1 w-4 h-4 accent-primary text-white rounded border-gray-300"
-                      />
-                      <div>
-                        <span className="block font-bold text-slate-800">Replicar automaticamente para o mês seguinte</span>
-                        <span className="block text-sm text-slate-500 mt-0.5">As terapias dessa grade serão copiadas para os mesmos dias da semana no mês subsequente.</span>
-                      </div>
-                    </label>
-                  </div>
-                </>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Local (Sala)</label>
+                  <select 
+                    value={formRoom}
+                    onChange={(e) => setFormRoom(e.target.value)}
+                    className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                  >
+                    <option>Sala 01 - Principal</option>
+                    <option>Sala 02 - Integração Sensorial</option>
+                    <option>Sala 03</option>
+                    <option>Sala 04</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Valor por Sessão (R$)</label>
+                  <input 
+                    type="number"
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(e.target.value)}
+                    placeholder="180,00"
+                    className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none text-slate-600"
+                  />
+                </div>
+              </div>
 
               <div className="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3 border-t border-slate-100 mt-6">
                 <button 
@@ -828,7 +909,11 @@ export default function GestaoAgenda() {
                   disabled={isSubmitting}
                   className="w-full sm:w-auto px-8 py-3 sm:py-2.5 font-bold bg-primary text-white hover:bg-primary/90 rounded-xl shadow-md transition-colors disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Salvando...' : (editingAppointmentId ? 'Salvar Alteração' : 'Salvar Planejamento Mensal')}
+                  {isSubmitting 
+                    ? 'Salvando...' 
+                    : recurrenceType === 'single' 
+                    ? 'Salvar Agendamento' 
+                    : 'Gerar Plano e Agendamentos'}
                 </button>
               </div>
             </form>
