@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Lock, User, Loader2, Mail } from 'lucide-react';
 import type { UserRole } from '../../App';
 import { supabase } from '../../lib/supabase';
+import { formatCPF } from '../../lib/utils';
 
 interface IntranetLoginProps {
   onClose: () => void;
@@ -18,15 +19,7 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
   const [fullName, setFullName] = useState('');
   const [cpf, setCpf] = useState(''); // Mantido apenas para cadastro
 
-  const formatCpf = (value: string) => {
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1');
-  };
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -191,7 +184,7 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
                   <input 
                     type="text" 
                     value={cpf}
-                    onChange={(e) => setCpf(formatCpf(e.target.value))}
+                    onChange={(e) => setCpf(formatCPF(e.target.value))}
                     placeholder="000.000.000-00"
                     maxLength={14}
                     className="w-full pl-10 pr-4 py-3 bg-white/50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-slate-400 text-slate-700"

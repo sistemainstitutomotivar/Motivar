@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, Search, Edit, Trash2, X, Camera, ShieldCheck, UserCheck, Briefcase } from 'lucide-react';
+import { getSpecialties } from '../../lib/specialties';
+import type { Specialty } from '../../lib/specialties';
+import { formatCPF } from '../../lib/utils';
+
 import { supabase } from '../../lib/supabase';
 import { logAuditEvent } from '../../lib/audit';
 import imageCompression from 'browser-image-compression';
@@ -9,6 +13,7 @@ interface MockUser {
   name: string;
   role: 'patient' | 'professional' | 'collaborator';
   specialty?: string; // Para terapeutas
+  council_number?: string;
   position?: string; // Para colaboradores (Secretária, Recepção, etc.)
   email?: string;
   mother_name?: string;
@@ -38,6 +43,16 @@ const initialUsers: MockUser[] = [
 
 export default function GestaoCadastros() {
   const [activeTab, setActiveTab] = useState<'patient' | 'professional' | 'collaborator'>('patient');
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  
+
+  useEffect(() => {
+    getSpecialties().then(data => {
+      setSpecialties(data);
+      
+    });
+  }, []);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -277,6 +292,7 @@ export default function GestaoCadastros() {
             name: formData.name,
             specialty: formData.specialty,
             contact: formData.contact,
+          council_number: formData.council_number,
             cpf: formData.cpf,
             avatar_url: uploadedAvatarUrl
           }).eq('id', editingId); 
@@ -287,6 +303,7 @@ export default function GestaoCadastros() {
             position: formData.position || 'Secretária',
             email: formData.email,
             contact: formData.contact,
+          council_number: formData.council_number,
             cpf: formData.cpf,
             avatar_url: uploadedAvatarUrl
           }).eq('id', editingId);
@@ -330,6 +347,7 @@ export default function GestaoCadastros() {
             name: formData.name,
             specialty: formData.specialty,
             contact: formData.contact,
+          council_number: formData.council_number,
             cpf: formData.cpf,
             status: 'active',
             avatar_url: uploadedAvatarUrl
@@ -342,6 +360,7 @@ export default function GestaoCadastros() {
             position: formData.position || 'Secretária',
             email: formData.email,
             contact: formData.contact,
+          council_number: formData.council_number,
             cpf: formData.cpf,
             status: 'active',
             avatar_url: uploadedAvatarUrl
@@ -571,13 +590,17 @@ export default function GestaoCadastros() {
                 </div>
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-slate-700 mb-1">Foto de Perfil</label>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={handleImageChange}
-                    className="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90"
-                  />
-                  <p className="text-[11px] text-slate-400 mt-1">Otimizada automaticamente para menos de 200 KB.</p>
+                  <div>
+                    <label className="cursor-pointer inline-block py-1.5 px-4 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors shadow-sm mt-1">
+                      Escolher arquivo
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -726,7 +749,7 @@ export default function GestaoCadastros() {
 
               {/* CAMPOS ESPECÍFICOS PARA TERAPEUTA */}
               {activeTab === 'professional' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">Especialidade Principal *</label>
                     <select
@@ -734,10 +757,20 @@ export default function GestaoCadastros() {
                       onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
                       className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
                     >
-                      {therapyOptions.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
+                      {specialties.map(opt => (
+                        <option key={opt.id} value={opt.name}>{opt.name}</option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Número do Conselho (CRM, CRP, etc)</label>
+                    <input 
+                      type="text" 
+                      value={formData.council_number || ''} 
+                      onChange={(e) => setFormData({ ...formData, council_number: e.target.value })}
+                      placeholder="Ex: CRP 12345/SP"
+                      className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">WhatsApp / Telefone *</label>
@@ -802,7 +835,7 @@ export default function GestaoCadastros() {
                 <input 
                   type="text" 
                   value={formData.cpf || ''} 
-                  onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, cpf: formatCPF(e.target.value) })}
                   placeholder="000.000.000-00"
                   className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-primary outline-none"
                 />

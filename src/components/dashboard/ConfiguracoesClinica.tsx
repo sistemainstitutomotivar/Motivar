@@ -3,6 +3,10 @@ import { Building, Clock, ShieldAlert, Search, RefreshCw, Save, AlertTriangle } 
 import { supabase } from '../../lib/supabase';
 import { logAuditEvent } from '../../lib/audit';
 import type { AuditLogEntry } from '../../lib/audit';
+import { getSpecialties, createSpecialty, deleteSpecialty } from '../../lib/specialties';
+import type { Specialty } from '../../lib/specialties';
+import { Stethoscope, Trash2 } from 'lucide-react';
+
 
 const initialMockAuditLogs: AuditLogEntry[] = [
   {
@@ -48,7 +52,26 @@ const initialMockAuditLogs: AuditLogEntry[] = [
 ];
 
 export default function ConfiguracoesClinica() {
-  const [activeTab, setActiveTab] = useState<'dados' | 'horarios' | 'auditoria'>('dados');
+  const [activeTab, setActiveTab] = useState<'dados' | 'horarios' | 'auditoria' | 'especialidades'>('dados');
+
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [newSpec, setNewSpec] = useState('');
+  
+  useEffect(() => {
+    getSpecialties().then(setSpecialties);
+  }, []);
+  
+  const handleAddSpec = async () => {
+    if (!newSpec.trim()) return;
+    const added = await createSpecialty(newSpec.trim());
+    setSpecialties(prev => [...prev, added].sort((a,b) => a.name.localeCompare(b.name)));
+    setNewSpec('');
+  };
+  
+  const handleDelSpec = async (id: string) => {
+    await deleteSpecialty(id);
+    setSpecialties(prev => prev.filter(s => s.id !== id));
+  };
   
   // Dados da Clínica
   const [clinicName, setClinicName] = useState('Instituto Motivar');
@@ -227,6 +250,17 @@ export default function ConfiguracoesClinica() {
           <ShieldAlert size={18} />
           Trilha de Auditoria (Logs)
         </button>
+          <button 
+            onClick={() => setActiveTab('especialidades')}
+            className={`flex flex-col sm:flex-row items-center justify-center gap-2 flex-1 py-4 font-bold border-b-2 transition-colors ${
+              activeTab === 'especialidades' 
+                ? 'border-primary text-primary' 
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <Stethoscope size={20} />
+            <span>Especialidades</span>
+          </button>
       </div>
 
       {/* ABA 1: DADOS DA CLÍNICA */}
@@ -512,6 +546,52 @@ export default function ConfiguracoesClinica() {
 
         </div>
       )}
+      {activeTab === 'especialidades' && (
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-3 bg-primary/10 text-primary rounded-xl">
+              <Stethoscope size={24} />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-slate-800">Especialidades e Terapias</h3>
+              <p className="text-sm text-slate-500">Gerencie as especialidades que aparecerão no cadastro de terapeutas e agendamentos.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-6">
+            <input 
+              type="text" 
+              value={newSpec}
+              onChange={(e) => setNewSpec(e.target.value)}
+              placeholder="Nova especialidade (ex: Neuropsicologia)"
+              className="flex-1 p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary outline-none"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddSpec()}
+            />
+            <button 
+              onClick={handleAddSpec}
+              className="px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-colors"
+            >
+              Adicionar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {specialties.map(spec => (
+              <div key={spec.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="font-bold text-slate-700">{spec.name}</span>
+                <button 
+                  onClick={() => handleDelSpec(spec.id)}
+                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Remover especialidade"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
 
     </div>
   );
