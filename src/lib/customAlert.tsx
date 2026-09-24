@@ -43,7 +43,7 @@ const AlertModal: React.FC<AlertProps> = ({
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-2xl shadow-xl w-[90vw] max-w-[400px] min-w-[300px] p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
         {getIcon()}
         <h3 className="text-xl font-bold text-slate-800 mb-2">{title}</h3>
         {message && <p className="text-sm text-slate-600 mb-6">{message}</p>}
