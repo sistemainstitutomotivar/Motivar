@@ -15,6 +15,7 @@ export default function PatientAgenda() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPatientName, setCurrentPatientName] = useState('Paciente');
+  const [currentPatientAvatar, setCurrentPatientAvatar] = useState<string | null>(null);
 
   // Filters
   const [filterDate, setFilterDate] = useState('');
@@ -32,12 +33,13 @@ export default function PatientAgenda() {
 
       const { data: patientData } = await supabase
         .from('clinic_patients')
-        .select('id, name')
+        .select('id, name, avatar_url')
         .eq('email', user.email)
         .single();
 
       if (patientData) {
         setCurrentPatientName(patientData.name);
+        setCurrentPatientAvatar(patientData.avatar_url);
         
         // Puxa consultas a partir de hoje
         const today = new Date().toISOString().split('T')[0];
@@ -227,14 +229,18 @@ export default function PatientAgenda() {
                                   {session.therapist_name.charAt(0)}
                                 </div>
                               )}
-                              {isExpanded && <span className="font-label-sm text-primary font-bold mt-2 text-xs">Terapeuta</span>}
+                              {isExpanded && <span className="font-label-sm text-primary font-bold mt-2 text-xs">{session.therapist_name.split(' ')[0]}</span>}
                             </div>
                             
                             <div className={`flex flex-col items-center ${isExpanded ? 'z-10' : 'z-0 absolute left-8'}`}>
-                              <div className={`rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold border-2 border-white shadow-sm transition-all duration-300 ${isExpanded ? 'w-20 h-20 text-2xl' : 'w-12 h-12 text-sm'}`}>
-                                {currentPatientName.charAt(0)}
-                              </div>
-                              {isExpanded && <span className="font-label-sm text-blue-600 font-bold mt-2 text-xs">Você</span>}
+                              {currentPatientAvatar ? (
+                                <img src={currentPatientAvatar} alt="Paciente" className={`object-cover border-2 border-white shadow-sm rounded-full transition-all duration-300 ${isExpanded ? 'w-20 h-20' : 'w-12 h-12'}`} />
+                              ) : (
+                                <div className={`rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold border-2 border-white shadow-sm transition-all duration-300 ${isExpanded ? 'w-20 h-20 text-2xl' : 'w-12 h-12 text-sm'}`}>
+                                  {currentPatientName.charAt(0)}
+                                </div>
+                              )}
+                              {isExpanded && <span className="font-label-sm text-blue-600 font-bold mt-2 text-xs">{currentPatientName.split(' ')[0]}</span>}
                             </div>
                           </div>
 

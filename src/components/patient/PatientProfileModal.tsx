@@ -127,7 +127,7 @@ export default function PatientProfileModal({ onClose }: PatientProfileModalProp
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex justify-end">
-      <div className="bg-[#fff8f7] w-full max-w-xl h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="bg-[#fff8f7] w-[90vw] sm:w-[500px] shrink-0 h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
         
         {/* HEADER */}
         <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-rose-100 shadow-sm shrink-0">
