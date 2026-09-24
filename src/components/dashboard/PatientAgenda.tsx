@@ -133,8 +133,25 @@ export default function PatientAgenda() {
   });
 
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayApts = filteredAppointments.filter(a => a.date === todayStr);
-  const futureApts = filteredAppointments.filter(a => a.date !== todayStr);
+  const firstDate = filteredAppointments.length > 0 ? filteredAppointments[0].date : null;
+  
+  const featuredApts = filteredAppointments.filter(a => a.date === firstDate);
+  const futureApts = filteredAppointments.filter(a => a.date !== firstDate);
+
+  let featuredTitle = "Próximas Sessões";
+  if (firstDate) {
+    if (firstDate === todayStr) {
+      featuredTitle = "Sessões de Hoje";
+    } else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (firstDate === tomorrow.toISOString().split('T')[0]) {
+        featuredTitle = "Sessões de Amanhã";
+      } else {
+        featuredTitle = `Sessões do dia ${formatDateBR(firstDate)}`;
+      }
+    }
+  }
 
   return (
     <div className="space-y-8 w-full">
@@ -179,15 +196,15 @@ export default function PatientAgenda() {
         </div>
       ) : (
         <>
-          {/* SESSÕES DE HOJE - CARDS EXPANSÍVEIS */}
-          {todayApts.length > 0 && (
+          {/* SESSÕES EM DESTAQUE - CARDS EXPANSÍVEIS */}
+          {featuredApts.length > 0 && (
             <div className="space-y-4">
               <h4 className="font-bold text-lg text-slate-700 flex items-center gap-2 px-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(233,40,108,0.6)]"></span>
-                Sessões de Hoje
+                {featuredTitle}
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
-                {todayApts.map(session => {
+                {featuredApts.map(session => {
                   const isExpanded = expandedId === session.id;
 
                   return (
@@ -276,6 +293,11 @@ export default function PatientAgenda() {
                               <p className={`text-sm font-bold mt-0.5 ${session.status === 'confirmed' ? 'text-emerald-600' : session.status === 'cancelled' ? 'text-red-600' : 'text-blue-600'}`}>
                                 {session.status === 'confirmed' ? 'Presença Confirmada' : session.status === 'cancelled' ? 'Sessão Cancelada' : 'Aguardando sua Confirmação'}
                               </p>
+                              {session.status === 'cancelled' && session.justification && (
+                                <div className="mt-2 p-2.5 bg-red-50/50 border border-red-100 rounded-lg">
+                                  <p className="text-xs text-red-700"><span className="font-bold">Motivo:</span> {session.justification}</p>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -324,7 +346,7 @@ export default function PatientAgenda() {
                       </div>
                     </div>
                     
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-end gap-3 w-full lg:w-auto">
                       <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg shadow-sm">
                         <Calendar className="w-4 h-4 text-slate-400" />
                         <span className="text-sm font-bold text-slate-700">
@@ -355,8 +377,16 @@ export default function PatientAgenda() {
                       )}
 
                       {apt.status === 'cancelled' && (
-                        <div className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center gap-1">
-                          <XCircle size={14} /> Cancelada
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center gap-1">
+                            <XCircle size={14} /> Cancelada
+                          </div>
+                        </div>
+                      )}
+
+                      {apt.status === 'cancelled' && apt.justification && (
+                        <div className="w-full sm:w-auto px-3 py-1.5 text-xs text-red-600 bg-red-50/50 border border-red-100 rounded-lg ml-auto">
+                          <span className="font-bold">Motivo:</span> {apt.justification}
                         </div>
                       )}
                     </div>
@@ -366,7 +396,7 @@ export default function PatientAgenda() {
             </div>
           )}
 
-          {todayApts.length === 0 && futureApts.length === 0 && (
+          {featuredApts.length === 0 && futureApts.length === 0 && (
             <div className="p-12 bg-white rounded-3xl border border-slate-100 flex flex-col items-center justify-center text-center mt-4 shadow-sm">
               <Calendar className="w-12 h-12 text-slate-300 mb-4" />
               <h4 className="text-lg font-bold text-slate-700 mb-1">Nenhuma consulta encontrada</h4>
@@ -381,7 +411,7 @@ export default function PatientAgenda() {
       {/* MODAL DE JUSTIFICATIVA (GLOBAL PARA CARDS E LISTA) */}
       {cancelModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-md shadow-2xl relative animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 w-[90vw] max-w-[400px] sm:w-[400px] min-w-[300px] shrink-0 shadow-2xl relative animate-in fade-in zoom-in duration-200">
             <button 
               onClick={() => setCancelModalOpen(false)}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-colors"
