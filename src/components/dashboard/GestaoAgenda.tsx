@@ -1,3 +1,4 @@
+import { showAlert, showConfirm } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, Plus, Filter, Search, CheckCircle, XCircle, 
@@ -203,11 +204,11 @@ export default function GestaoAgenda() {
   const confirmCancellation = async () => {
     const { appointmentId, requestedBy, reason, appointmentDate, appointmentTime, patientName } = cancelModalData;
     if (!requestedBy) {
-      alert("Selecione quem solicitou o cancelamento.");
+      showAlert('Aviso', "Selecione quem solicitou o cancelamento.");
       return;
     }
     if (!reason.trim()) {
-      alert("Informe a observação/motivo do cancelamento.");
+      showAlert('Aviso', "Informe a observação/motivo do cancelamento.");
       return;
     }
     if (!appointmentId || !appointmentDate || !appointmentTime) return;
@@ -226,7 +227,7 @@ export default function GestaoAgenda() {
       if (diffHours < 24) {
         statusNote = "[CANCELADO PELO PACIENTE < 24H: Faturado]";
         const isPast = diffHours < 0;
-        const confirmCancel = window.confirm(
+        const confirmCancel = await showConfirm('Atenção', 
           `Atenção: Este cancelamento solicitado pelo PACIENTE está sendo feito com menos de 24h de antecedência (${
             isPast ? 'Sessão já ocorreu ou está no horário' : Math.floor(diffHours) + 'h restantes'
           }).\n\nSegundo a política da clínica, a sessão será faturada normalmente.\n\nDeseja prosseguir?`
@@ -288,13 +289,13 @@ export default function GestaoAgenda() {
   const handleSaveAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formPatient) {
-      alert('Por favor, selecione o paciente.');
+      showAlert('Aviso', 'Por favor, selecione o paciente.');
       return;
     }
 
     const invalidTherapy = weeklyTherapies.find(t => !t.therapist || !t.time);
     if (invalidTherapy) {
-      alert('Preencha horário e terapeuta para todas as terapias na grade.');
+      showAlert('Aviso', 'Preencha horário e terapeuta para todas as terapias na grade.');
       return;
     }
 
@@ -322,7 +323,7 @@ export default function GestaoAgenda() {
         setAppointments(prev => prev.map(a => 
           a.id === editingAppointmentId ? { ...a, ...baseAppointmentData } : a
         ));
-        alert('Agendamento atualizado com sucesso!');
+        showAlert('Aviso', 'Agendamento atualizado com sucesso!');
       } else {
         // Modo Criação Mensal
         const groupId = crypto.randomUUID();
@@ -365,14 +366,14 @@ export default function GestaoAgenda() {
         });
 
         if (occurrences.length === 0) {
-          alert('Nenhum dia correspondente encontrado no mês selecionado.');
+          showAlert('Aviso', 'Nenhum dia correspondente encontrado no mês selecionado.');
           setIsSubmitting(false);
           return;
         }
 
         const createdBatch = await createBatchAppointments(occurrences);
         setAppointments(prev => [...createdBatch, ...prev]);
-        alert(`Planejamento mensal gerado com sucesso! ${createdBatch.length} sessões agendadas.`);
+        showAlert('Aviso', `Planejamento mensal gerado com sucesso! ${createdBatch.length} sessões agendadas.`);
       }
 
       setIsModalOpen(false);
@@ -381,7 +382,7 @@ export default function GestaoAgenda() {
       setEditingAppointmentId(null);
     } catch (err) {
       console.error(err);
-      alert('Ocorreu um erro ao salvar o planejamento.');
+      showAlert('Aviso', 'Ocorreu um erro ao salvar o planejamento.');
     } finally {
       setIsSubmitting(false);
     }

@@ -1,3 +1,4 @@
+import { showAlert, showConfirm } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { CreditCard, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Search, Filter, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -123,7 +124,7 @@ export default function GestaoFinanceiro() {
 
   // Dar Baixa / Confirmar Pagamento com Auditoria
   const handleConfirmPayment = async (record: FinancialRecord) => {
-    if (!window.confirm(`Deseja confirmar o recebimento de R$ ${record.amount.toFixed(2)} de ${record.patient_name}?`)) {
+    if (!await showConfirm('Atenção', `Deseja confirmar o recebimento de R$ ${record.amount.toFixed(2)} de ${record.patient_name}?`)) {
       return;
     }
 
@@ -152,7 +153,7 @@ export default function GestaoFinanceiro() {
       }
     });
 
-    alert('Pagamento confirmado e registrado na trilha de auditoria!');
+    showAlert('Aviso', 'Pagamento confirmado e registrado na trilha de auditoria!');
   };
 
   // Criar Lançamento com Auditoria
@@ -202,7 +203,7 @@ export default function GestaoFinanceiro() {
     setFormPatient('');
     setFormDesc('');
     setFormAmount('');
-    alert('Lançamento financeiro registrado com sucesso!');
+    showAlert('Aviso', 'Lançamento financeiro registrado com sucesso!');
   };
 
   // Filtros

@@ -1,3 +1,4 @@
+import { showAlert, showConfirm } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { X, Calendar, Clock, MapPin, Info, CheckCircle, XCircle } from 'lucide-react';
 import { getAppointments, updateAppointmentStatus } from '../../lib/appointments';
@@ -39,7 +40,7 @@ export default function PatientAgenda() {
     setAppointments(prev => prev.map(s => s.id === id ? { ...s, status: 'confirmed' } : s));
     const target = appointments.find(a => a.id === id);
     await updateAppointmentStatus(id, 'confirmed', undefined, target?.patient_name || currentPatientName);
-    alert('Presença confirmada com sucesso! A clínica já foi notificada.');
+    showAlert('Aviso', 'Presença confirmada com sucesso! A clínica já foi notificada.');
   };
 
   const handleCancel = async (id: string) => {
@@ -60,7 +61,7 @@ export default function PatientAgenda() {
     if (diffHours < 24) {
       statusNote = "[CANCELADO PELO PACIENTE < 24H: Faturado]";
       const isPast = diffHours < 0;
-      const confirmCancel = window.confirm(
+      const confirmCancel = await showConfirm('Atenção', 
         `Atenção: Você está cancelando esta sessão com menos de 24h de antecedência (${
           isPast ? 'Sessão já ocorreu ou está no horário' : Math.floor(diffHours) + 'h restantes'
         }).\n\nSegundo as políticas da clínica, essa sessão será considerada executada e faturada normalmente no seu plano.\n\nDeseja confirmar o cancelamento ciente desta regra?`
@@ -68,7 +69,7 @@ export default function PatientAgenda() {
       if (!confirmCancel) return;
     } else {
       statusNote = "[CANCELADO PELO PACIENTE > 24H: Reagendamento Permitido]";
-      alert(`Cancelamento dentro do prazo (mais de 24h).\n\nVocê tem direito a reagendar esta sessão sem custo adicional.`);
+      showAlert('Aviso', `Cancelamento dentro do prazo (mais de 24h).\n\nVocê tem direito a reagendar esta sessão sem custo adicional.`);
     }
 
     const finalReason = `${statusNote} ${justification.trim()}`;
@@ -78,7 +79,7 @@ export default function PatientAgenda() {
     setJustification('');
 
     await updateAppointmentStatus(id, 'cancelled', finalReason, target.patient_name || currentPatientName);
-    alert('Cancelamento registrado na clínica com justificativa salva na auditoria.');
+    showAlert('Aviso', 'Cancelamento registrado na clínica com justificativa salva na auditoria.');
   };
 
   return (

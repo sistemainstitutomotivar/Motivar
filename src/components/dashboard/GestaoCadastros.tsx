@@ -1,3 +1,4 @@
+import { showAlert, showConfirm } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { UserPlus, Search, Edit, Trash2, X, Camera, ShieldCheck, UserCheck, Briefcase } from 'lucide-react';
 import { getSpecialties } from '../../lib/specialties';
@@ -157,12 +158,12 @@ export default function GestaoCadastros() {
 
   const handleDelete = async (id: string) => {
     const userToDelete = allUsers.find(u => u.id === id);
-    if (!window.confirm(`Tem certeza que deseja remover o cadastro de "${userToDelete?.name || 'este registro'}"?`)) {
+    if (!await showConfirm('Atenção', `Tem certeza que deseja remover o cadastro de "${userToDelete?.name || 'este registro'}"?`)) {
       return;
     }
 
     if (id.length < 10) {
-      alert('Os usuários de demonstração (fictícios) não podem ser excluídos. Exclua apenas os que você cadastrou no banco real.');
+      showAlert('Aviso', 'Os usuários de demonstração (fictícios) não podem ser excluídos. Exclua apenas os que você cadastrou no banco real.');
       return;
     }
     
@@ -188,11 +189,11 @@ export default function GestaoCadastros() {
         }
       });
 
-      alert('Cadastro removido com sucesso e registrado na trilha de auditoria.');
+      showAlert('Aviso', 'Cadastro removido com sucesso e registrado na trilha de auditoria.');
       fetchDbUsers();
     } catch (err) {
       console.error(err);
-      alert('Erro ao excluir o cadastro.');
+      showAlert('Aviso', 'Erro ao excluir o cadastro.');
     }
   };
 
@@ -232,7 +233,7 @@ export default function GestaoCadastros() {
     
     try {
       if (editingId && editingId.length < 10) {
-        alert('Não é possível editar usuários de demonstração. Eles são apenas para visualização.');
+        showAlert('Aviso', 'Não é possível editar usuários de demonstração. Eles são apenas para visualização.');
         setIsSaving(false);
         return;
       }
@@ -264,7 +265,7 @@ export default function GestaoCadastros() {
           uploadedAvatarUrl = publicUrlData.publicUrl;
         } catch (imgError) {
           console.error("Erro ao comprimir/subir imagem:", imgError);
-          alert('Houve um erro ao enviar a imagem (verifique se o bucket "avatars" está público no Supabase). O cadastro será salvo sem foto.');
+          showAlert('Aviso', 'Houve um erro ao enviar a imagem (verifique se o bucket "avatars" está público no Supabase). O cadastro será salvo sem foto.');
         }
       }
 
@@ -383,11 +384,11 @@ export default function GestaoCadastros() {
       
       setIsModalOpen(false);
       fetchDbUsers();
-      alert('Cadastro salvo e registrado na auditoria com sucesso!');
+      showAlert('Aviso', 'Cadastro salvo e registrado na auditoria com sucesso!');
     } catch (err) {
       console.error("Erro ao salvar:", err);
       const errorMsg = err instanceof Error ? err.message : (err as any)?.message || JSON.stringify(err);
-      alert('ERRO DO SUPABASE:\n\n' + errorMsg);
+      showAlert('Aviso', 'ERRO DO SUPABASE:\n\n' + errorMsg);
     } finally {
       setIsSaving(false);
     }

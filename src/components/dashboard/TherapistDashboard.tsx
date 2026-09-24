@@ -1,3 +1,4 @@
+import { showAlert } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { FileText, Calendar, Clock, Search, ChevronRight, Plus, UserCheck } from 'lucide-react';
 import { getAppointments } from '../../lib/appointments';
@@ -116,7 +117,7 @@ export default function TherapistDashboard() {
       }
     });
 
-    alert('Evolução clínica salva e registrada na trilha de auditoria!');
+    showAlert('Aviso', 'Evolução clínica salva e registrada na trilha de auditoria!');
   };
 
   // Extrai lista única de pacientes desta terapeuta

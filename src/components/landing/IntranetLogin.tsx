@@ -1,3 +1,4 @@
+import { showAlert } from '../../lib/customAlert';
 import { useState } from 'react';
 import { X, Lock, User, Loader2, Mail } from 'lucide-react';
 import type { UserRole } from '../../App';
@@ -61,7 +62,7 @@ export default function IntranetLogin({ onClose }: IntranetLoginProps) {
 
         if (signUpError) throw signUpError;
         
-        alert("Conta criada com sucesso! Se você não for logado automaticamente, verifique as configurações de confirmação de e-mail no Supabase.");
+        showAlert('Aviso', "Conta criada com sucesso! Se você não for logado automaticamente, verifique as configurações de confirmação de e-mail no Supabase.");
         onClose();
 
       } else {

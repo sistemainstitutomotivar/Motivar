@@ -1,3 +1,4 @@
+import { showAlert } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { Building, Clock, ShieldAlert, Search, RefreshCw, Save, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -138,7 +139,7 @@ export default function ConfiguracoesClinica() {
     });
 
     setIsSavingClinic(false);
-    alert('Dados da clínica salvos e alteração registrada na auditoria!');
+    showAlert('Aviso', 'Dados da clínica salvos e alteração registrada na auditoria!');
   };
 
   const handleSaveHours = async (e: React.FormEvent) => {
@@ -151,7 +152,7 @@ export default function ConfiguracoesClinica() {
       details: { openingTime, closingTime, sessionDuration, rooms }
     });
 
-    alert('Horários e salas atualizados e registrados na auditoria!');
+    showAlert('Aviso', 'Horários e salas atualizados e registrados na auditoria!');
   };
 
   const handleAddRoom = () => {
