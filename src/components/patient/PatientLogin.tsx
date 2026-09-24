@@ -259,7 +259,7 @@ export default function PatientLogin({ onLoginSuccess, onBack }: PatientLoginPro
           {step === 'otp' && (
             <form onSubmit={handleVerifyOtp} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Código de 6 dígitos</label>
+                <label className="block text-sm font-medium text-gray-700">Código numérico</label>
                 <input
                   type="text"
                   required
@@ -267,13 +267,13 @@ export default function PatientLogin({ onLoginSuccess, onBack }: PatientLoginPro
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   className="mt-1 block w-full text-center text-2xl tracking-widest sm:text-lg border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 h-12 border"
                   placeholder="000000"
-                  maxLength={6}
+                  maxLength={8}
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={loading || otp.length !== 6}
+                disabled={loading || otp.length < 6}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none disabled:opacity-70"
               >
                 {loading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Verificar Código'}
