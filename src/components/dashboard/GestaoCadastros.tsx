@@ -74,6 +74,7 @@ export default function GestaoCadastros() {
   const mapPatientRecord = (d: any): MockUser => ({
     id: d.id,
     name: d.name,
+    email: d.email,
     role: 'patient',
     mother_name: d.mother_name,
     mother_contact: d.mother_contact,
@@ -120,6 +121,8 @@ export default function GestaoCadastros() {
             role: 'professional',
             specialty: d.specialty,
             contact: d.contact,
+            email: d.email,
+            council_number: d.council_number,
             status: d.status,
             cpf: d.cpf,
             avatar_url: d.avatar_url
@@ -139,6 +142,7 @@ export default function GestaoCadastros() {
             position: d.position,
             email: d.email,
             contact: d.contact,
+            council_number: d.council_number,
             status: d.status,
             cpf: d.cpf,
             avatar_url: d.avatar_url

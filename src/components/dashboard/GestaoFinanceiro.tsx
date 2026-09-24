@@ -1,3 +1,4 @@
+import { formatDateBR } from '../../lib/utils';
 import { showAlert, showConfirm } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { CreditCard, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Search, Filter, X } from 'lucide-react';
@@ -360,7 +361,7 @@ export default function GestaoFinanceiro() {
                 
                 {/* Data e Recibo */}
                 <div className="col-span-2 flex flex-col">
-                  <span className="font-bold text-slate-800 text-sm">{r.date}</span>
+                  <span className="font-bold text-slate-800 text-sm">{formatDateBR(r.date)}</span>
                   <span className="text-xs text-slate-400 font-mono">{r.receipt_number || 'Sem recibo'}</span>
                 </div>
 

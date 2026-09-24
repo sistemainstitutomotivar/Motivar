@@ -1,3 +1,4 @@
+import { formatDateBR } from '../../lib/utils';
 import { showAlert, showConfirm } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { X, Calendar, Clock, MapPin, Info, CheckCircle, XCircle } from 'lucide-react';
@@ -181,7 +182,7 @@ export default function PatientAgenda() {
                   <div className={`flex items-center gap-4 mt-2 ${isExpanded ? 'justify-center bg-surface-variant/30 p-3 rounded-xl' : ''}`}>
                     <div className="flex items-center gap-1.5 text-on-surface">
                       <Calendar size={20} className="text-primary" />
-                      <span className="font-label-md font-bold">{session.date}</span>
+                      <span className="font-label-md font-bold">{formatDateBR(session.date)}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-on-surface">
                       <Clock size={20} className="text-primary" />

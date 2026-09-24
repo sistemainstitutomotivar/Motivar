@@ -1,3 +1,4 @@
+import { formatDateBR } from '../../lib/utils';
 import { showAlert } from '../../lib/customAlert';
 import { useState, useEffect } from 'react';
 import { FileText, Calendar, Clock, Search, ChevronRight, Plus, UserCheck } from 'lucide-react';
@@ -127,7 +128,7 @@ export default function TherapistDashboard() {
       return {
         name,
         avatar: apt?.patient_avatar,
-        nextSession: `${apt?.date} às ${apt?.time}`,
+        nextSession: `${formatDateBR(apt?.date || '')} às ${apt?.time}`,
         condition: 'Em Acompanhamento Terapêutico'
       };
     });
@@ -197,7 +198,7 @@ export default function TherapistDashboard() {
 
                 <div className="flex items-center gap-2 text-primary bg-primary-container/30 w-fit px-3 py-1.5 rounded-lg mt-2">
                   <Clock size={16} />
-                  <span className="font-label-md font-bold">{apt.date} - {apt.time}</span>
+                  <span className="font-label-md font-bold">{formatDateBR(apt.date)} - {apt.time}</span>
                 </div>
 
                 <div className="mt-4 flex gap-2">
@@ -334,7 +335,7 @@ export default function TherapistDashboard() {
                     <div key={note.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
                       <div className="flex justify-between items-center text-xs text-slate-500 pb-2 border-b border-slate-200">
                         <span className="font-bold text-primary">{note.therapist_name}</span>
-                        <span>{note.date}</span>
+                        <span>{formatDateBR(note.date)}</span>
                       </div>
                       <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{note.content}</p>
                     </div>
