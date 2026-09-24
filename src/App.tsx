@@ -64,8 +64,11 @@ function App() {
         
       if (data && data.role) {
         setUserRole(data.role as UserRole);
-        if (data.force_password_change) {
+        
+        const justUsedOtp = localStorage.getItem('require_password_setup') === 'true';
+        if (data.force_password_change || justUsedOtp) {
           setForcePasswordChange(true);
+          localStorage.removeItem('require_password_setup');
         }
       } else {
         throw new Error('Perfil não encontrado na tabela profiles');

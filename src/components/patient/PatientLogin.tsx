@@ -91,7 +91,11 @@ export default function PatientLogin({ onLoginSuccess, onBack }: PatientLoginPro
       });
 
       if (verifyError) throw verifyError;
-      setStep('create_password');
+      
+      // Sinaliza para o App.tsx que este login via OTP exige a criação de senha na sequência
+      localStorage.setItem('require_password_setup', 'true');
+      
+      // Obs: não precisa chamar setStep porque o App.tsx vai assumir o controle assim que a sessão for criada
     } catch (err: any) {
       setError('Código inválido ou expirado.');
     } finally {

@@ -65,10 +65,10 @@ export default function ForcePasswordChange({ onPasswordChanged }: Props) {
         </div>
         
         <h2 className="text-2xl font-bold text-slate-800 text-center mb-2">
-          Atualização Obrigatória
+          Defina sua Senha Definitiva
         </h2>
         <p className="text-slate-600 text-center mb-8 text-sm">
-          Como este é o seu primeiro acesso com uma senha temporária, você precisa criar uma nova senha pessoal para continuar.
+          Para a sua segurança, por favor crie uma Senha Definitiva. Você usará esta senha para os seus próximos acessos rápidos ao sistema.
         </p>
 
         {error && (

@@ -356,7 +356,7 @@ export default function GestaoAgenda() {
                 therapist_name: t.therapist,
                 therapist_avatar: selectedTherapistObj?.avatar_url,
                 room: t.room,
-                status: 'confirmed',
+                status: 'pending',
                 payment_status: 'pending',
                 recurrence_type: 'weekly',
                 recurrence_group_id: groupId,
