@@ -266,7 +266,7 @@ export default function PatientLogin({ onLoginSuccess, onBack }: PatientLoginPro
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
                   className="mt-1 block w-full text-center text-2xl tracking-widest sm:text-lg border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 h-12 border"
-                  placeholder="000000"
+                  placeholder="00000000"
                   maxLength={8}
                 />
               </div>
