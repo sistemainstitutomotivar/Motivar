@@ -386,11 +386,7 @@ export default function Scrollytelling() {
               
               <canvas id="canvas-seq-0" className="scrolly-canvas-seq" data-frames-dir="assets/frames_slide_1" data-total-frames="60" style={{ width: '100%', height: '100%', objectFit: 'cover' }}></canvas>
               
-              <div className="scrolly-360-badge" style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(0,0,0,0.5)', padding: '8px 16px', borderRadius: '20px', color: 'white' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.934a.5.5 0 0 0-.777-.416L16 11"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
-                <span>Sequência Canvas 60fps</span>
-              </div>
-              <div className="scrolly-overlay" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.8), transparent)' }}></div>
+              {/* Badge e overlay removidos a pedido do usuário */}
             </div>
             
             <div className="scrolly-caption-box pos-center-left theme-glass" style={{ position: 'absolute', bottom: '10%', left: '10%', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', padding: '24px', borderRadius: '12px', color: 'white', maxWidth: '400px' }}>
@@ -405,11 +401,7 @@ export default function Scrollytelling() {
           </div>
         </div>
         
-        {/* Indicador de Navegação */}
-        <div className="scrolly-scroll-hint" style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.7 }}>
-          <div className="mouse-icon" style={{ width: 24, height: 36, border: '2px solid white', borderRadius: 12, marginBottom: 8 }}></div>
-          <small>Role para avançar e adentrar nos ambientes</small>
-        </div>
+        {/* Indicador de navegação removido a pedido do usuário */}
       </div>
     </section>
   );
