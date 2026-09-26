@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import * as THREE from 'three';
@@ -112,7 +112,7 @@ export default function Scrollytelling() {
       geometry.scale(-1, 1, 1);
 
       const loader = new THREE.TextureLoader();
-      loader.load(imageSrc, (texture) => {
+      loader.load(imageSrc, (texture: THREE.Texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
         const material = new THREE.MeshBasicMaterial({ map: texture });
         const mesh = new THREE.Mesh(geometry, material);
@@ -127,7 +127,7 @@ export default function Scrollytelling() {
       let currentLat = 0;
       let isUserInteracting = false;
       let isScrolling = false;
-      let scrollTimeout: NodeJS.Timeout | null = null;
+      let scrollTimeout: ReturnType<typeof setTimeout> | null = null;
 
       let onPointerDownMouseX = 0;
       let onPointerDownMouseY = 0;
@@ -358,7 +358,7 @@ export default function Scrollytelling() {
       }
     });
 
-    let resizeTimeout: NodeJS.Timeout;
+    let resizeTimeout: ReturnType<typeof setTimeout>;
     const handleGlobalResize = () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
