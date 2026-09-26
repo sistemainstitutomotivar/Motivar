@@ -23,12 +23,41 @@ export default function LandingPage() {
             <HeroSection />
 
       {/* 1. SCROLLYTELLING: ADENTRANDO A CLÍNICA */}
-      {/* Placeholder para o futuro vídeo de entrada na clínica */}
-      <div id="tour-clinica" className="w-full min-h-[50vh] bg-slate-900 flex flex-col items-center justify-center py-20 text-slate-400 text-center border-y border-slate-800">
-        <span className="material-symbols-outlined text-4xl mb-4">movie</span>
-        <h3 className="text-2xl font-bold text-white mb-2">Adentrando a Clínica</h3>
-        <p className="max-w-[448px]">Espaço reservado para o vídeo Scrollytelling de entrada pela porta até a recepção/corredor.</p>
-      </div>
+      <section className="scrollytelling-section" id="tour-virtual">
+        <div className="scrollytelling-sticky-viewport">
+          <div className="scrollytelling-slides-wrapper">
+            
+            {/* Slide 1: Para testar na prática */}
+            <div className="scrolly-slide" data-slide-index="0" data-is-360="false" data-is-canvas="true">
+              <div className="scrolly-media-wrapper">
+                
+                <canvas id="canvas-seq-0" className="scrolly-canvas-seq" data-frames-dir="assets/frames_slide_1" data-total-frames="60"></canvas>
+                <div className="scrolly-360-badge">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.934a.5.5 0 0 0-.777-.416L16 11"/><rect width="14" height="12" x="2" y="6" rx="2"/></svg>
+                  <span>Sequência Canvas 60fps</span>
+                </div>
+                <div className="scrolly-overlay"></div>
+              </div>
+              
+              <div className="scrolly-caption-box pos-center-left theme-glass">
+                <div className="scrolly-step-tag">
+                  <span className="step-num">01</span>
+                  <span className="step-divider">/</span>
+                  <span className="step-total">01</span>
+                  <span className="step-label">Passo a Passo do Imóvel</span>
+                </div>
+                <h3 className="scrolly-title">Para testar na prática</h3>
+              </div>
+            </div>
+          </div>
+          
+          {/* Indicador de Navegação */}
+          <div className="scrolly-scroll-hint">
+            <div className="mouse-icon"></div>
+            <small>Role para avançar e adentrar nos ambientes</small>
+          </div>
+        </div>
+      </section>
 
       <div id="especialidades">
         
